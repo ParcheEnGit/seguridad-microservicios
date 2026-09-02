@@ -1,0 +1,29 @@
+# Secrets and environment-specific configuration
+.env
+.env.*
+!.env.example
+secrets/
+
+# Dependencies and build artefacts
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+build/
+coverage/
+.coverage
+
+# Logs and local runtime data
+*.log
+logs/
+data/
+tmp/
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
