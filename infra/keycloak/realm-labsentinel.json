@@ -1,0 +1,38 @@
+{
+  "realm": "labsentinel",
+  "enabled": true,
+  "displayName": "LabSentinel",
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administración completa de LabSentinel"
+      },
+      {
+        "name": "lector",
+        "description": "Consulta autorizada y creación de tickets no críticos"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "labsentinel-web",
+      "name": "LabSentinel Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8080/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:8080", "http://localhost:5173"]
+    },
+    {
+      "clientId": "labsentinel-simulator",
+      "name": "LabSentinel Device Simulator",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ]
+}

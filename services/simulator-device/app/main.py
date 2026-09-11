@@ -6,7 +6,7 @@ import time
 
 def main() -> None:
     telemetry_url = os.getenv("TELEMETRY_URL", "http://telemetry-service:8000/health")
-    print(f"LabWatch simulator ready. Telemetry target: {telemetry_url}", flush=True)
+    print(f"LabSentinel simulator ready. Telemetry target: {telemetry_url}", flush=True)
     while True:
         time.sleep(60)
 

@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "report-service")
-app = FastAPI(title="LabWatch Report Service", version="0.1.0")
+app = FastAPI(title="LabSentinel Report Service", version="0.1.0")
 
 
 @app.get("/health", tags=["system"])
