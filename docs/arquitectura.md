@@ -1,32 +1,36 @@
 # Arquitectura lógica y de seguridad
 
-## Componentes
+## Componentes aprobados
 
-| Componente | Responsabilidad | Exposición prevista |
+| Componente | Responsabilidad | Acceso |
 | --- | --- | --- |
-| Cliente de prueba | Iniciar sesión y solicitar recursos | Externo |
-| API Gateway | Punto de entrada, enrutamiento y controles transversales | Público |
-| Servicio de identidad | Verificar credenciales y emitir/gestionar la identidad de acceso | Interno o mediante gateway |
-| Servicio de recurso protegido | Aplicar autorización y devolver el recurso de prueba | Interno o mediante gateway |
+| React | Interfaz de administración, consulta y tickets | Admin y lector |
+| Nginx | Entrada única y proxy inverso | Público |
+| Keycloak | Identidad, roles `admin`/`lector` y clientes técnicos | Login y administración restringida |
+| Device service | Inventario y estado de dispositivos | Admin escribe; lector consulta |
+| Telemetry service | Lecturas enviadas por simulador | Simulador publica; usuarios consultan según rol |
+| Alert-ticket service | Umbrales, alertas y tickets no críticos | Admin gestiona; lector crea/consulta tickets |
+| Report service | Resúmenes y reportes autorizados | Admin completo; lector limitado |
+| PostgreSQL | Persistencia interna | Solo servicios |
 
-## Flujo propuesto
+## Flujo principal
 
 ```mermaid
 sequenceDiagram
-    participant C as Cliente
-    participant G as API Gateway
-    participant I as Servicio de identidad
-    participant R as Recurso protegido
+    participant U as Admin o lector
+    participant F as React
+    participant K as Keycloak
+    participant G as Nginx
+    participant S as Servicio protegido
 
-    C->>G: Credenciales de inicio de sesión
-    G->>I: Solicitud de autenticación
-    I-->>G: Credencial de acceso con identidad/permisos
-    G-->>C: Credencial de acceso
-    C->>G: Solicitud al recurso + credencial
-    G->>R: Solicitud enrutada
-    R->>R: Validar credencial y permiso
-    R-->>G: Recurso o rechazo de acceso
-    G-->>C: Respuesta
+    U->>F: Inicia sesión
+    F->>K: Autenticación OIDC
+    K-->>F: Token con rol
+    F->>G: Solicitud + Bearer token
+    G->>S: Solicitud enrutada
+    S->>S: Valida firma, expiración, emisor, audiencia y rol
+    S-->>G: Respuesta o rechazo 401/403
+    G-->>F: Respuesta
 ```
 
 ## Controles mínimos a implementar
@@ -38,9 +42,9 @@ sequenceDiagram
 - Las respuestas de error no expondrán secretos ni información innecesaria.
 - Se registrarán eventos de autenticación y rechazo sin almacenar contraseñas o tokens completos.
 
-## Decisiones pendientes
+## Decisiones adoptadas
 
-No se ha decidido aún: lenguaje/framework, JWT frente a OAuth 2.0/OIDC, proveedor de identidad, base de datos, protocolo concreto, uso de TLS local, contenedores, observabilidad ni despliegue. Registrar cada decisión y su motivo en [tecnologias.md](tecnologias.md).
+FastAPI/Python 3.11, React/Vite, Keycloak OAuth 2.0/OIDC, RBAC con roles `admin` y `lector`, Nginx, PostgreSQL y Docker Compose. La primera versión usa HTTP local para desarrollo; HTTPS/TLS será una mejora documentada para despliegue real.
 
 ## Diagramas que faltará elaborar
 

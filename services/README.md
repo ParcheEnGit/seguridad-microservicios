@@ -1,7 +1,9 @@
 # Servicios
 
-Cada subcarpeta contendrá una implementación autónoma cuando se defina el stack. Evitar colocar secretos o copiar lógica de seguridad sin una decisión documentada.
+Los servicios se ejecutan como contenedores FastAPI independientes. Keycloak y Nginx son componentes de infraestructura y viven en `infra/`.
 
-- `api-gateway/`: acceso externo y enrutamiento.
-- `identity-service/`: autenticación e identidad.
-- `protected-resource-service/`: recurso de prueba y autorización.
+- `device-service/`: dispositivos virtuales.
+- `telemetry-service/`: lecturas enviadas por el simulador técnico.
+- `alert-ticket-service/`: umbrales, alertas y tickets de lectores.
+- `report-service/`: resúmenes y reportes protegidos.
+- `simulator-device/`: perfil opcional; no envía datos hasta que el contrato de telemetría esté aprobado.
