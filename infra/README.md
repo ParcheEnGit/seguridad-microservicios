@@ -1,3 +1,7 @@
 # Infraestructura
 
-Aquí se añadirán Dockerfiles, archivos Compose, scripts y configuraciones de despliegue después de decidir el stack. No se incluye un `docker-compose.yml` vacío: un archivo de orquestación sin imágenes, puertos ni variables reales no es ejecutable y confundiría la documentación.
+- `keycloak/realm-labwatch.json`: realm, roles y clientes de desarrollo.
+- `nginx/default.conf`: gateway y rutas internas.
+- `postgres/init/`: creación inicial de base para Keycloak.
+
+La orquestación vive en `compose.yaml` en la raíz del repositorio.
