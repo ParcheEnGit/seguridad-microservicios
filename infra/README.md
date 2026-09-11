@@ -1,6 +1,6 @@
 # Infraestructura
 
-- `keycloak/realm-labwatch.json`: realm, roles y clientes de desarrollo.
+- `keycloak/realm-labsentinel.json`: realm, roles y clientes de desarrollo.
 - `nginx/default.conf`: gateway y rutas internas.
 - `postgres/init/`: creación inicial de base para Keycloak.
 

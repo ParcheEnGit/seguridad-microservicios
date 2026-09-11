@@ -14,13 +14,13 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-El primer inicio descarga imágenes y puede tardar varios minutos. PostgreSQL crea las bases `labwatch` y `keycloak` solo al inicializar un volumen vacío. Si se cambia `KEYCLOAK_DB` después del primer arranque, habrá que recrear deliberadamente el volumen de desarrollo.
+El primer inicio descarga imágenes y puede tardar varios minutos. PostgreSQL crea las bases `labsentinel` y `keycloak` solo al inicializar un volumen vacío. Si se cambia `KEYCLOAK_DB` después del primer arranque, habrá que recrear deliberadamente el volumen de desarrollo. PostgreSQL 18 usa el volumen en `/var/lib/postgresql`, configuración ya aplicada en `compose.yaml`.
 
 ## URLs iniciales
 
 | Recurso | URL |
 | --- | --- |
-| LabWatch mediante gateway | `http://localhost:8080` |
+| LabSentinel mediante gateway | `http://localhost:8080` |
 | Frontend Vite directo | `http://localhost:5173` |
 | Keycloak | `http://localhost:8081` |
 | Device health | `http://localhost:8080/api/devices/health` |
@@ -30,9 +30,9 @@ El primer inicio descarga imágenes y puede tardar varios minutos. PostgreSQL cr
 
 ## Realm y roles
 
-El realm `labwatch` se importa automáticamente al iniciar Keycloak. Ingrese con `KEYCLOAK_ADMIN` y la contraseña de `.env`; después cree los usuarios de prueba. A cada usuario humano asígnele exactamente uno de los roles de realm: `admin` o `lector`.
+El realm `labsentinel` se importa automáticamente al iniciar Keycloak. Ingrese con `KEYCLOAK_ADMIN` y la contraseña de `.env`; después cree los usuarios de prueba. A cada usuario humano asígnele exactamente uno de los roles de realm: `admin` o `lector`.
 
-El cliente `labwatch-web` está preparado para el frontend local. El cliente `labwatch-simulator` queda creado para la futura identidad técnica del simulador. Genere y guarde su secreto exclusivamente en `.env` cuando se implemente el envío de lecturas.
+El cliente `labsentinel-web` está preparado para el frontend local. El cliente `labsentinel-simulator` queda creado para la futura identidad técnica del simulador. Genere y guarde su secreto exclusivamente en `.env` cuando se implemente el envío de lecturas.
 
 ## Comandos útiles
 

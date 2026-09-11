@@ -9,7 +9,7 @@ function App() {
       <section className="card" aria-labelledby="app-title">
         <div className="brand">
           <Activity aria-hidden="true" />
-          <span>LabWatch</span>
+          <span>LabSentinel</span>
         </div>
         <h1 id="app-title">Monitoreo seguro de laboratorios</h1>
         <p>

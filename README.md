@@ -1,4 +1,4 @@
-# LabWatch — Grupo 36
+# LabSentinel — Grupo 36
 
 Plataforma telemática segura para el monitoreo de laboratorios mediante microservicios, OAuth 2.0/OIDC y contenedores.
 
@@ -17,10 +17,10 @@ Plataforma telemática segura para el monitoreo de laboratorios mediante microse
 1. Instalar Docker Desktop y verificar `docker compose version`.
 2. Copiar `.env.example` a `.env` y reemplazar todas las contraseñas locales.
 3. Ejecutar `docker compose up --build`.
-4. Abrir `http://localhost:8080` para LabWatch y `http://localhost:8081` para la consola de Keycloak.
+4. Abrir `http://localhost:8080` para LabSentinel y `http://localhost:8081` para la consola de Keycloak.
 5. Comprobar los endpoints de salud mediante el gateway: `/api/devices/health`, `/api/telemetry/health`, `/api/alerts-tickets/health` y `/api/reports/health`.
 
-Keycloak importa el realm `labwatch` al iniciar. Cree los usuarios de prueba y asigne los roles `admin` o `lector` desde su consola. No use contraseñas reales en desarrollo.
+Keycloak importa el realm `labsentinel` al iniciar. Cree los usuarios de prueba y asigne los roles `admin` o `lector` desde su consola. No use contraseñas reales en desarrollo.
 
 ## Estructura
 
