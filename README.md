@@ -1,57 +1,55 @@
-# Seguridad de microservicios — Grupo 36
+# LabSentinel — Grupo 36
 
-Proyecto semestral de **Servicios Telemáticos**, gestión 2-2026.
+Plataforma telemática segura para el monitoreo de laboratorios mediante microservicios, OAuth 2.0/OIDC y contenedores.
 
-## Propósito
+## Stack aprobado
 
-Diseñar e implementar una arquitectura de microservicios que aplique autenticación y autorización para proteger el acceso a recursos de un servicio telemático. El producto será un conjunto reproducible de microservicios protegidos, acompañado de su documentación y pruebas experimentales.
+- Frontend: React + Vite + Lucide.
+- Servicios: Python 3.11 + FastAPI.
+- Identidad: Keycloak 26.7.3 con OAuth 2.0/OIDC y roles `admin`/`lector`.
+- Gateway: Nginx.
+- Persistencia: PostgreSQL 18.
+- Infraestructura: Docker Compose.
+- Pruebas: pytest/HTTPX y k6.
 
-> Estado inicial: la arquitectura lógica está definida, pero el grupo aún debe seleccionar y justificar el lenguaje, framework, proveedor de identidad, mecanismo de tokens, base de datos y observabilidad. No se debe considerar este repositorio como una implementación funcional todavía.
+## Inicio rápido
 
-## Alcance inicial
+1. Instalar Docker Desktop y verificar `docker compose version`.
+2. Copiar `.env.example` a `.env` y reemplazar todas las contraseñas locales.
+3. Ejecutar `docker compose up --build`.
+4. Abrir `http://localhost:8080` para LabSentinel y `http://localhost:8081` para la consola de Keycloak.
+5. Comprobar los endpoints de salud mediante el gateway: `/api/devices/health`, `/api/telemetry/health`, `/api/alerts-tickets/health` y `/api/reports/health`.
 
-- Autenticar usuarios y emitir credenciales de acceso.
-- Autorizar solicitudes por roles o permisos.
-- Proteger al menos un recurso expuesto por un microservicio.
-- Centralizar el acceso externo mediante un API Gateway.
-- Ejecutar pruebas funcionales, de seguridad, rendimiento y escalabilidad.
-- Empaquetar la solución con contenedores si esa alternativa es aprobada por el grupo.
-
-No incluye, salvo decisión posterior del grupo, gestión completa de usuarios, inicio de sesión social, recuperación de contraseñas, multi-tenencia, alta disponibilidad productiva ni despliegue cloud.
-
-## Arquitectura lógica propuesta
-
-```text
-Cliente → API Gateway → Servicio de identidad
-                     → Servicio de recurso protegido
-```
-
-El gateway recibe las solicitudes externas; el servicio de identidad autentica y entrega credenciales; y el recurso protegido valida la identidad/autorización antes de responder. Los nombres, protocolos concretos y tecnología se documentarán en [docs/arquitectura.md](docs/arquitectura.md).
+Keycloak importa el realm `labsentinel` al iniciar. Cree los usuarios de prueba y asigne los roles `admin` o `lector` desde su consola. No use contraseñas reales en desarrollo.
 
 ## Estructura
 
 ```text
-docs/          Perfil, arquitectura, decisiones y guías del informe
-services/      Implementaciones independientes de cada microservicio
-contracts/     Contratos de API compartidos, no código compartido
-tests/         Pruebas funcionales, seguridad, rendimiento y escalabilidad
-infra/         Contenedores, Compose, scripts y configuración de despliegue
+apps/frontend/                 React + Vite
+services/device-service/       Inventario de dispositivos
+services/telemetry-service/    Lecturas simuladas
+services/alert-ticket-service/ Umbrales, alertas y tickets
+services/report-service/       Vistas y reportes autorizados
+services/simulator-device/     Simulador técnico (perfil opcional)
+infra/keycloak/                Realm inicial
+infra/nginx/                   API Gateway
+infra/postgres/                Inicialización de base de datos
+contracts/                     Contratos API antes de implementar endpoints
+tests/                         Pruebas funcionales, seguridad y carga
 ```
 
-## Próximos acuerdos del grupo
+## Reglas de seguridad
 
-1. Definir el caso de uso del recurso protegido y los roles.
-2. Comparar y seleccionar el stack tecnológico mediante la matriz en `docs/tecnologias.md`.
-3. Decidir el mecanismo de autenticación/autorización (p. ej., JWT u OAuth 2.0/OIDC) y justificarlo.
-4. Completar los contratos API y el diagrama de despliegue antes de programar.
+- No subir `.env`, tokens, contraseñas ni secretos.
+- Validar token y rol dentro de cada microservicio protegido; el gateway no es la única defensa.
+- `admin` tiene control completo; `lector` consulta datos autorizados y crea tickets no críticos.
+- El simulador es un cliente técnico distinto de los usuarios humanos.
 
 ## Trabajo colaborativo
 
-- `main`: versiones estables y entregables.
-- `develop`: integración del desarrollo.
-- `feature/<tema>`: trabajo individual; por ejemplo, `feature/identity-service`.
-- Abrir un pull request hacia `develop` y revisar antes de integrar.
+- `main`: entregas estables.
+- `develop`: integración.
+- `feature/<tema>`: una tarea concreta por rama.
+- Pull request y revisión cruzada antes de fusionar a `develop`.
 
-## Documentación obligatoria
-
-La guía del curso exige, entre otros componentes, perfil, problema, justificación, objetivos, marco teórico, estado del arte, arquitectura, selección de tecnologías, implementación, pruebas experimentales, análisis, manual técnico, presentación, código y documentación técnica. El índice y las plantillas están en [docs/README.md](docs/README.md).
+Consulte [docs/configuracion-inicial.md](docs/configuracion-inicial.md) antes de comenzar el primer sprint.
