@@ -2,7 +2,7 @@
 
 Plataforma telemática segura para el monitoreo de laboratorios mediante microservicios, OAuth 2.0/OIDC y contenedores.
 
-## Stack aprobado
+## Stack tecnológico:
 
 - Frontend: React + Vite + Lucide.
 - Servicios: Python 3.11 + FastAPI.
@@ -12,7 +12,7 @@ Plataforma telemática segura para el monitoreo de laboratorios mediante microse
 - Infraestructura: Docker Compose.
 - Pruebas: pytest/HTTPX y k6.
 
-## Inicio rápido
+## Inicio rápido:
 
 1. Instalar Docker Desktop y verificar `docker compose version`.
 2. Copiar `.env.example` a `.env` y reemplazar todas las contraseñas locales.
@@ -22,7 +22,7 @@ Plataforma telemática segura para el monitoreo de laboratorios mediante microse
 
 Keycloak importa el realm `labsentinel` al iniciar. Cree los usuarios de prueba y asigne los roles `admin` o `lector` desde su consola. No use contraseñas reales en desarrollo.
 
-## Estructura
+## Estructura:
 
 ```text
 apps/frontend/                 React + Vite
@@ -38,18 +38,18 @@ contracts/                     Contratos API antes de implementar endpoints
 tests/                         Pruebas funcionales, seguridad y carga
 ```
 
-## Reglas de seguridad
+## Reglas de seguridad:
 
 - No subir `.env`, tokens, contraseñas ni secretos.
 - Validar token y rol dentro de cada microservicio protegido; el gateway no es la única defensa.
 - `admin` tiene control completo; `lector` consulta datos autorizados y crea tickets no críticos.
 - El simulador es un cliente técnico distinto de los usuarios humanos.
 
-## Trabajo colaborativo
+## Trabajo colaborativo:
 
 - `main`: entregas estables.
 - `develop`: integración.
 - `feature/<tema>`: una tarea concreta por rama.
 - Pull request y revisión cruzada antes de fusionar a `develop`.
 
-Consulte [docs/configuracion-inicial.md](docs/configuracion-inicial.md) antes de comenzar el primer sprint.
+Consulte [docs/configuracion-inicial.md](docs/configuracion-inicial.md).
