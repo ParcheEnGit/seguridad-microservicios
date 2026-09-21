@@ -1,0 +1,345 @@
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #f4f7f5;
+  color: #1f2937;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 16px;
+  background: #fff;
+  border-right: 1px solid #e5ece8;
+}
+
+.dashboard-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0b4f35;
+}
+
+.dashboard-sidebar__logo {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #eaf6ef;
+  color: #0b4f35;
+}
+
+.dashboard-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.dashboard-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #52615a;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard-nav-item:hover {
+  background: #f3faf6;
+  color: #0b4f35;
+}
+
+.dashboard-nav-item--active {
+  background: #edf7f1;
+  color: #0b4f35;
+}
+
+.dashboard-sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #e5ece8;
+}
+
+.dashboard-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.dashboard-user-chip__avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #0b4f35;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dashboard-user-chip__avatar--image {
+  object-fit: cover;
+  background: #e5ece8;
+}
+
+.dashboard-user-chip__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-user-chip__meta strong {
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-user-chip__meta span {
+  font-size: 0.82rem;
+  color: #6b7a73;
+}
+
+.dashboard-logout-btn {
+  border: 0;
+  background: transparent;
+  color: #0b4f35;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.dashboard-logout-btn:hover {
+  text-decoration: underline;
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 28px;
+  background: #fff;
+  border-bottom: 1px solid #e5ece8;
+}
+
+.dashboard-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 520px;
+  padding: 0 14px;
+  border: 1px solid #d8e3dc;
+  border-radius: 999px;
+  background: #fafcfb;
+  color: #9aa8a1;
+}
+
+.dashboard-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 12px 0;
+  font: inherit;
+  color: #1f2937;
+}
+
+.dashboard-search input:focus {
+  outline: none;
+}
+
+.dashboard-search input:disabled {
+  cursor: not-allowed;
+}
+
+.dashboard-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.dashboard-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #52615a;
+}
+
+.dashboard-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #16a34a;
+}
+
+.dashboard-icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #d8e3dc;
+  border-radius: 999px;
+  background: #fff;
+  color: #52615a;
+  cursor: pointer;
+}
+
+.dashboard-icon-btn__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.dashboard-content {
+  padding: 24px 28px 32px;
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-grid--stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.dashboard-grid--main {
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.dashboard-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboard-card {
+  background: #fff;
+  border: 1px solid #e5ece8;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(11, 79, 53, 0.04);
+}
+
+.dashboard-card__title {
+  margin: 0 0 16px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.dashboard-card--placeholder {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.dashboard-grid--main .dashboard-card--placeholder:first-child {
+  min-height: 360px;
+}
+
+.dashboard-card__placeholder-text {
+  margin: 0;
+  color: #9aa8a1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.dashboard-outline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #0b4f35;
+  border-radius: 12px;
+  background: #fff;
+  color: #0b4f35;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.dashboard-role-note {
+  margin: 18px 0 0;
+  color: #6b7a73;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-grid--stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid--main {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e5ece8;
+  }
+
+  .dashboard-sidebar__nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
