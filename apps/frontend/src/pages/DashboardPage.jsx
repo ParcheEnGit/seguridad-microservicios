@@ -12,7 +12,7 @@ const STAT_CARDS = [
 ];
 
 export function DashboardPage({ user, onLogout }) {
-  const [activeItem, setActiveItem] = useState("home");
+  const [activeItem, setActiveItem] = useState("inicio");
 
   return (
     <DashboardLayout
@@ -44,7 +44,7 @@ export function DashboardPage({ user, onLogout }) {
 
       {!isAdmin(user.role) && (
         <p className="dashboard-role-note">
-          Vista de usuario. Algunas opciones del menú estarán disponibles en próximas iteraciones.
+          Dashboard Lector. Puedes consultar información autorizada y registrar tickets; la gestión administrativa está restringida.
         </p>
       )}
     </DashboardLayout>
