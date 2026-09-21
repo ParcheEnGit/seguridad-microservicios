@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.roles import resolve_role_for_email
@@ -51,6 +52,16 @@ class UserRepository:
         self.db.refresh(user)
         return user
 
+    def _sync_profile(self, user: User, *, name: str, picture_url: str | None) -> User:
+        if user.name != name or user.picture_url != picture_url:
+            return self.update_profile(
+                user,
+                name=name,
+                role=user.role,
+                picture_url=picture_url,
+            )
+        return user
+
     def get_or_create(
         self,
         google_id: str,
@@ -62,22 +73,19 @@ class UserRepository:
         role = resolve_role_for_email(email, admin_emails)
         existing = self.get_by_google_id(google_id)
         if existing:
-            if (
-                existing.role != role
-                or existing.name != name
-                or existing.picture_url != picture_url
-            ):
-                return self.update_profile(
-                    existing,
-                    name=name,
-                    role=role,
-                    picture_url=picture_url,
-                )
-            return existing
-        return self.create(
-            google_id=google_id,
-            email=email,
-            name=name,
-            role=role,
-            picture_url=picture_url,
-        )
+            return self._sync_profile(existing, name=name, picture_url=picture_url)
+
+        try:
+            return self.create(
+                google_id=google_id,
+                email=email,
+                name=name,
+                role=role,
+                picture_url=picture_url,
+            )
+        except IntegrityError:
+            self.db.rollback()
+            existing = self.get_by_google_id(google_id)
+            if existing is None:
+                raise
+            return self._sync_profile(existing, name=name, picture_url=picture_url)

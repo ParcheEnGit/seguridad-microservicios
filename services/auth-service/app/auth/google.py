@@ -27,6 +27,9 @@ def verify_google_id_token(token: str, settings: Settings) -> dict:
     if id_info.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}:
         raise GoogleTokenVerificationError("Unexpected token issuer")
 
+    if id_info.get("email_verified") is not True:
+        raise GoogleTokenVerificationError("Google token email is not verified")
+
     google_id = id_info.get("sub")
     email = id_info.get("email")
     name = id_info.get("name") or email
