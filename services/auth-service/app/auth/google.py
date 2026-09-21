@@ -38,4 +38,5 @@ def verify_google_id_token(token: str, settings: Settings) -> dict:
         "google_id": google_id,
         "email": email,
         "name": name,
+        "picture_url": id_info.get("picture"),
     }

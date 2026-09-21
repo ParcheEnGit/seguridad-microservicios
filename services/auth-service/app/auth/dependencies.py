@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.jwt_utils import JwtValidationError, decode_session_token
 from app.core.config import Settings, get_settings
+from app.core.roles import is_admin
 from app.db.models import User
 from app.db.session import get_db
 from app.repositories.user_repository import UserRepository
@@ -43,3 +44,12 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not is_admin(current_user.role):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user

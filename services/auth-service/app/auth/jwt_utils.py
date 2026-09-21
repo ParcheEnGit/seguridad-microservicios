@@ -17,6 +17,7 @@ def create_session_token(user: User, settings: Settings) -> str:
         "email": user.email,
         "name": user.name,
         "google_id": user.google_id,
+        "role": user.role,
         "exp": expires_at,
         "iat": datetime.now(UTC),
     }

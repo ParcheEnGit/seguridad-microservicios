@@ -10,6 +10,8 @@ class UserResponse(BaseModel):
     email: str
     name: str
     google_id: str
+    role: int
+    picture_url: str | None = None
 
     model_config = {"from_attributes": True}
 

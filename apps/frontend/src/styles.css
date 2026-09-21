@@ -239,6 +239,18 @@ body {
   text-align: center;
 }
 
+.dashboard-copy {
+  margin: 0 0 24px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.auth-session-badge--admin {
+  background: #fff4e5;
+  color: #9a6700;
+}
+
 .auth-forgot {
   display: inline-block;
   margin-top: 22px;

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.migrate import apply_migrations
 from app.db.session import engine
 
 settings = get_settings()
@@ -17,6 +18,7 @@ app = FastAPI(title="LabSentinel Auth Service", version="0.1.0")
 @app.on_event("startup")
 def create_tables() -> None:
     Base.metadata.create_all(bind=engine)
+    apply_migrations(engine)
 
 
 app.add_middleware(

@@ -21,10 +21,19 @@ class Settings(BaseSettings):
     cookie_name: str = "labsentinel_session"
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
+    admin_emails: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in self.admin_emails.split(",")
+            if email.strip()
+        }
 
 
 @lru_cache

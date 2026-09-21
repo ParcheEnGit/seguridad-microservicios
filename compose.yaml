@@ -92,6 +92,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       COOKIE_SECURE: ${COOKIE_SECURE}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
     depends_on:
       postgres:
         condition: service_healthy

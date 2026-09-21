@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, UserResponse
 from app.auth.cookies import clear_session_cookie, set_session_cookie
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_admin, get_current_user
 from app.auth.google import GoogleTokenVerificationError, verify_google_id_token
 from app.auth.jwt_utils import create_session_token
 from app.core.config import Settings, get_settings
@@ -43,6 +43,8 @@ def login_with_google(
         google_id=google_profile["google_id"],
         email=google_profile["email"],
         name=google_profile["name"],
+        picture_url=google_profile.get("picture_url"),
+        admin_emails=settings.admin_email_set,
     )
 
     session_token = create_session_token(user, settings)
@@ -57,6 +59,14 @@ def login_with_google(
 @router.get("/me", response_model=UserResponse)
 def read_current_user(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.get("/admin/panel", response_model=dict[str, str])
+def read_admin_panel(current_user: User = Depends(get_current_admin)) -> dict[str, str]:
+    return {
+        "message": "Admin panel access granted",
+        "email": current_user.email,
+    }
 
 
 @router.post("/logout")
