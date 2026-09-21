@@ -18,7 +18,7 @@ def get_current_user(
     if not session_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
+            detail="Se requiere autenticación",
         )
 
     try:
@@ -33,14 +33,14 @@ def get_current_user(
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid session payload",
+            detail="La sesión no es válida",
         )
 
     user = UserRepository(db).get_by_id(int(user_id))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="No se encontró el usuario",
         )
 
     return user
@@ -50,6 +50,6 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     if not is_admin(current_user.role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
+            detail="Se requieren permisos de administrador",
         )
     return current_user
