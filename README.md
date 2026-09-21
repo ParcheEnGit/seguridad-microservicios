@@ -18,7 +18,8 @@ Plataforma telemática segura para el monitoreo de laboratorios mediante microse
 2. Copiar `.env.example` a `.env` y reemplazar todas las contraseñas locales.
 3. Ejecutar `docker compose up --build`.
 4. Abrir `http://localhost:8080` para LabSentinel y `http://localhost:8081` para la consola de Keycloak.
-5. Comprobar los endpoints de salud mediante el gateway: `/api/devices/health`, `/api/telemetry/health`, `/api/alerts-tickets/health` y `/api/reports/health`.
+5. Comprobar los endpoints de salud mediante el gateway: `/api/devices/health`, `/api/telemetry/health`, `/api/alerts-tickets/health`, `/api/reports/health` y `/api/auth/me` (requiere sesión).
+6. Configurar `GOOGLE_CLIENT_ID`, `VITE_GOOGLE_CLIENT_ID` y `JWT_SECRET` en `.env` para habilitar inicio de sesión con Google.
 
 Keycloak importa el realm `labsentinel` al iniciar. Cree los usuarios de prueba y asigne los roles `admin` o `lector` desde su consola. No use contraseñas reales en desarrollo.
 

@@ -2,6 +2,7 @@
 
 Los servicios se ejecutan como contenedores FastAPI independientes. Keycloak y Nginx son componentes de infraestructura y viven en `infra/`.
 
+- `auth-service/`: Google OAuth, sesión JWT en cookie HttpOnly y tabla `users`.
 - `device-service/`: dispositivos virtuales.
 - `telemetry-service/`: lecturas enviadas por el simulador técnico.
 - `alert-ticket-service/`: umbrales, alertas y tickets de lectores.

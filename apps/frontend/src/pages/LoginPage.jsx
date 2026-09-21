@@ -5,12 +5,13 @@ import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
 const INSTITUTIONAL_EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function LoginPage() {
+export function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   const emailInvalid =
     (emailTouched || submitAttempted) &&
@@ -21,13 +22,11 @@ export function LoginPage() {
   function handleSubmit(event) {
     event.preventDefault();
     setSubmitAttempted(true);
+    setAuthError("Email and password sign in is not enabled yet. Use Google.");
 
     if (!email || !INSTITUTIONAL_EMAIL_PATTERN.test(email) || !password) {
       return;
     }
-
-    // Keycloak integration will replace this placeholder.
-    console.info("Sign in requested", { email });
   }
 
   return (
@@ -43,6 +42,12 @@ export function LoginPage() {
           LabSentinel
         </h1>
         <p className="auth-subtitle">Secure laboratory monitoring</p>
+
+        {authError && (
+          <p className="auth-error auth-error--banner" role="alert">
+            {authError}
+          </p>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
@@ -106,7 +111,11 @@ export function LoginPage() {
         <div className="auth-divider" role="separator" aria-label="Or continue with">
           <span>or</span>
         </div>
-        <GoogleSignInButton />
+
+        <GoogleSignInButton
+          onSuccess={onLoginSuccess}
+          onError={setAuthError}
+        />
       </section>
 
       <footer className="auth-footer">

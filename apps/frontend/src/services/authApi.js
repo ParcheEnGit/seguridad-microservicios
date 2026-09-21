@@ -1,0 +1,65 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+function extractErrorMessage(data) {
+  if (typeof data.detail === "string") {
+    return data.detail;
+  }
+  if (Array.isArray(data.detail) && data.detail.length > 0) {
+    return data.detail[0]?.msg ?? "Request failed";
+  }
+  if (typeof data.message === "string") {
+    return data.message;
+  }
+  return "Request failed";
+}
+
+async function parseJsonResponse(response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(data));
+  }
+  return data;
+}
+
+export async function loginWithGoogle(credential) {
+  const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ credential }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function fetchCurrentUser() {
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "GET",
+      credentials: "include",
+    });
+  } catch {
+    throw new Error("Unable to reach the authentication service.");
+  }
+
+  if (response.status === 401) {
+    return null;
+  }
+
+  if (response.status === 502 || response.status === 503) {
+    return null;
+  }
+
+  return parseJsonResponse(response);
+}
+
+export async function logout() {
+  const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  return parseJsonResponse(response);
+}
