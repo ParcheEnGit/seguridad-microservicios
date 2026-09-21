@@ -6,7 +6,7 @@ export function isAdmin(role) {
 }
 
 export function getRoleLabel(role) {
-  return role === ROLE_ADMIN ? "Administrator" : "User";
+  return role === ROLE_ADMIN ? "Administrador" : "Lector";
 }
 
 export function canRegisterDevice(role) {
