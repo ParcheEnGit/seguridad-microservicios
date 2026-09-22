@@ -116,6 +116,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
+      LOCAL_PASSWORD_LOGIN_ENABLED: ${LOCAL_PASSWORD_LOGIN_ENABLED}
     depends_on:
       database-migrations:
         condition: service_completed_successfully
