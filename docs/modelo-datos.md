@@ -31,3 +31,18 @@ docker compose exec postgres psql -U labsentinel -d labsentinel -c "\\dt device_
 ```
 
 No se debe editar una migración ya aplicada en un entorno compartido. Las evoluciones posteriores se agregan como archivos numerados nuevos.
+
+## Implementación de HU5
+
+`device-service` es propietario del CRUD de `device_service.devices` y `device_service.thresholds`. Sus endpoints se exponen mediante el gateway bajo `/api/devices`:
+
+| Método | Ruta | Acceso | Finalidad |
+|---|---|---|---|
+| `GET` | `/devices` | Admin y lector | Lista con filtros, paginación y umbrales. |
+| `GET` | `/devices/{id}` | Admin y lector | Detalle y umbrales de un dispositivo. |
+| `POST` | `/devices` | Admin | Registro con umbrales iniciales. |
+| `PATCH` | `/devices/{id}` | Admin | Edición de datos del inventario. |
+| `PATCH` | `/devices/{id}/deactivate` | Admin | Desactivación lógica; no elimina historial. |
+| `PUT` | `/devices/{id}/thresholds` | Admin | Reemplazo validado de los umbrales. |
+
+El servicio valida la misma cookie de sesión JWT emitida por `auth-service`. Las operaciones de escritura requieren el claim de rol `admin`; las consultas son accesibles al lector para su Dashboard Lector.
