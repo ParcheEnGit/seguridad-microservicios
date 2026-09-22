@@ -5,12 +5,12 @@ function extractErrorMessage(data) {
     return data.detail;
   }
   if (Array.isArray(data.detail) && data.detail.length > 0) {
-    return data.detail[0]?.msg ?? "Request failed";
+    return data.detail[0]?.msg ?? "No se pudo completar la solicitud.";
   }
   if (typeof data.message === "string") {
     return data.message;
   }
-  return "Request failed";
+  return "No se pudo completar la solicitud.";
 }
 
 async function parseJsonResponse(response) {
@@ -41,7 +41,7 @@ export async function fetchCurrentUser() {
       credentials: "include",
     });
   } catch {
-    throw new Error("Unable to reach the authentication service.");
+    throw new Error("No se pudo conectar con el servicio de autenticación.");
   }
 
   if (response.status === 401) {

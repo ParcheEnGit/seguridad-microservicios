@@ -8,7 +8,7 @@ export function Sidebar({ user, activeItem, onNavigate, onLogout }) {
   const navItems = getNavItemsForRole(user.role);
 
   return (
-    <aside className="dashboard-sidebar" aria-label="Main navigation">
+    <aside className="dashboard-sidebar" aria-label="Navegación principal">
       <div className="dashboard-sidebar__brand">
         <div className="dashboard-sidebar__logo" aria-hidden="true">
           <Shield size={18} strokeWidth={2.2} />

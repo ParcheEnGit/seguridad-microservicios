@@ -36,7 +36,7 @@ def login_with_google(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to verify Google token. Check auth-service network access.",
+            detail="No se pudo verificar el token de Google. Revise la conexión del servicio de autenticación.",
         ) from exc
 
     user = UserRepository(db).get_or_create(
@@ -51,7 +51,7 @@ def login_with_google(
     set_session_cookie(response, session_token, settings)
 
     return AuthMessageResponse(
-        message="Signed in successfully",
+        message="Sesión iniciada correctamente",
         user=UserResponse.model_validate(user),
     )
 
