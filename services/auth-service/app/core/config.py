@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
     admin_emails: str = ""
+    local_password_login_enabled: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:
