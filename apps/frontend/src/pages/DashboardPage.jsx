@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { PlaceholderCard } from "../components/dashboard/PlaceholderCard.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { canRegisterDevice, isAdmin } from "../constants/roles.js";
+import { DevicesPage } from "./DevicesPage.jsx";
 
 const STAT_CARDS = [
   "Dispositivos activos",
@@ -21,6 +22,7 @@ export function DashboardPage({ user, onLogout }) {
       onNavigate={setActiveItem}
       onLogout={onLogout}
     >
+      {activeItem === "dispositivos" ? <DevicesPage user={user} /> : <>
       <section className="dashboard-grid dashboard-grid--stats" aria-label="Resumen">
         {STAT_CARDS.map((title) => (
           <PlaceholderCard key={title} title={title} />
@@ -47,6 +49,7 @@ export function DashboardPage({ user, onLogout }) {
           Dashboard Lector. Puedes consultar información autorizada y registrar tickets; la gestión administrativa está restringida.
         </p>
       )}
+      </>}
     </DashboardLayout>
   );
 }
