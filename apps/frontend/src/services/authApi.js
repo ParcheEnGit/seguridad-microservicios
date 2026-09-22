@@ -32,6 +32,17 @@ export async function loginWithGoogle(credential) {
   return parseJsonResponse(response);
 }
 
+export async function loginWithPassword(email, password) {
+  const response = await fetch(`${API_BASE_URL}/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+
+  return parseJsonResponse(response);
+}
+
 export async function fetchCurrentUser() {
   let response;
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Shield } from "lucide-react";
 import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
+import { loginWithPassword } from "../services/authApi.js";
 
 const INSTITUTIONAL_EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -19,13 +20,20 @@ export function LoginPage({ onLoginSuccess }) {
     !INSTITUTIONAL_EMAIL_PATTERN.test(email);
   const showEmailError = emailInvalid || (submitAttempted && email.length === 0);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setSubmitAttempted(true);
-    setAuthError("El inicio de sesión con correo y contraseña aún no está habilitado. Usa Google.");
+    setAuthError("");
 
     if (!email || !INSTITUTIONAL_EMAIL_PATTERN.test(email) || !password) {
       return;
+    }
+
+    try {
+      const data = await loginWithPassword(email, password);
+      onLoginSuccess(data.user);
+    } catch (error) {
+      setAuthError(error.message ?? "No se pudo iniciar sesión.");
     }
   }
 
