@@ -13,6 +13,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     picture_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[int] = mapped_column(Integer, nullable=False, default=ROLE_USER, index=True)
 
     __table_args__ = (

@@ -45,7 +45,7 @@ function AppContent() {
     return (
       <main className="auth-page">
         <section className="auth-card">
-          <p className="auth-subtitle">Loading...</p>
+          <p className="auth-subtitle">Cargando...</p>
         </section>
       </main>
     );
@@ -67,10 +67,10 @@ export function App() {
     return (
       <main className="auth-page">
         <section className="auth-card">
-          <h1 className="auth-title">Configuration required</h1>
+          <h1 className="auth-title">Configuración requerida</h1>
           <p className="auth-subtitle">
-            Set <code>VITE_GOOGLE_CLIENT_ID</code> in your <code>.env</code> file
-            to enable Google sign in.
+            Configura <code>VITE_GOOGLE_CLIENT_ID</code> en el archivo <code>.env</code>
+            para habilitar el inicio de sesión con Google.
           </p>
         </section>
       </main>

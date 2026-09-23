@@ -12,7 +12,7 @@ export function getUserInitials(name) {
 }
 
 export function getRoleLabelEs(role) {
-  return role === 0 ? "Administrador" : "Usuario";
+  return role === 0 ? "Administrador" : "Lector";
 }
 
 export function getRoleLabelForDisplay(role) {

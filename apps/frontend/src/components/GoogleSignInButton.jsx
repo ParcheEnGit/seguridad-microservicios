@@ -7,7 +7,7 @@ export function GoogleSignInButton({ onSuccess, onError }) {
 
   async function handleGoogleSuccess(credentialResponse) {
     if (!credentialResponse?.credential) {
-      onError?.("Google did not return a valid credential.");
+      onError?.("Google no devolvió una credencial válida.");
       return;
     }
 
@@ -16,14 +16,14 @@ export function GoogleSignInButton({ onSuccess, onError }) {
       const data = await loginWithGoogle(credentialResponse.credential);
       onSuccess?.(data.user);
     } catch (error) {
-      onError?.(error.message ?? "Google sign in failed.");
+      onError?.(error.message ?? "No se pudo iniciar sesión con Google.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   function handleGoogleError() {
-    onError?.("Google sign in was cancelled or failed.");
+    onError?.("El inicio de sesión con Google fue cancelado o falló.");
   }
 
   return (
@@ -36,7 +36,7 @@ export function GoogleSignInButton({ onSuccess, onError }) {
         width={360}
         text="signin_with"
         shape="rectangular"
-        locale="en"
+        locale="es"
       />
     </div>
   );

@@ -1,7 +1,9 @@
+import bcrypt
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, UserResponse
+from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, PasswordLoginRequest, UserResponse
 from app.auth.cookies import clear_session_cookie, set_session_cookie
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.auth.google import GoogleTokenVerificationError, verify_google_id_token
@@ -17,6 +19,29 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.get("/health")
 def auth_health() -> dict[str, str]:
     return {"service": "auth-service", "status": "ok"}
+
+
+
+@router.post("/password", response_model=AuthMessageResponse)
+def login_with_local_password(
+    payload: PasswordLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> AuthMessageResponse:
+    """Acceso local de pruebas; no se habilita fuera de development."""
+    if settings.app_env != "development" or not settings.local_password_login_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acceso local no disponible")
+    user = UserRepository(db).get_by_email(payload.email.strip().lower())
+    valid_password = bool(
+        user
+        and user.password_hash
+        and bcrypt.checkpw(payload.password.encode(), user.password_hash.encode())
+    )
+    if not valid_password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Correo o contraseña incorrectos")
+    set_session_cookie(response, create_session_token(user, settings), settings)
+    return AuthMessageResponse(message="Sesión iniciada correctamente", user=UserResponse.model_validate(user))
 
 
 @router.post("/google", response_model=AuthMessageResponse)
@@ -36,7 +61,7 @@ def login_with_google(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to verify Google token. Check auth-service network access.",
+            detail="No se pudo verificar el token de Google. Revise la conexión del servicio de autenticación.",
         ) from exc
 
     user = UserRepository(db).get_or_create(
@@ -51,7 +76,7 @@ def login_with_google(
     set_session_cookie(response, session_token, settings)
 
     return AuthMessageResponse(
-        message="Signed in successfully",
+        message="Sesión iniciada correctamente",
         user=UserResponse.model_validate(user),
     )
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Shield } from "lucide-react";
 import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
+import { loginWithPassword } from "../services/authApi.js";
 
 const INSTITUTIONAL_EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -19,13 +20,20 @@ export function LoginPage({ onLoginSuccess }) {
     !INSTITUTIONAL_EMAIL_PATTERN.test(email);
   const showEmailError = emailInvalid || (submitAttempted && email.length === 0);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setSubmitAttempted(true);
-    setAuthError("Email and password sign in is not enabled yet. Use Google.");
+    setAuthError("");
 
     if (!email || !INSTITUTIONAL_EMAIL_PATTERN.test(email) || !password) {
       return;
+    }
+
+    try {
+      const data = await loginWithPassword(email, password);
+      onLoginSuccess(data.user);
+    } catch (error) {
+      setAuthError(error.message ?? "No se pudo iniciar sesión.");
     }
   }
 
@@ -41,7 +49,7 @@ export function LoginPage({ onLoginSuccess }) {
         <h1 id="login-title" className="auth-title">
           LabSentinel
         </h1>
-        <p className="auth-subtitle">Secure laboratory monitoring</p>
+        <p className="auth-subtitle">Monitoreo seguro de laboratorios</p>
 
         {authError && (
           <p className="auth-error auth-error--banner" role="alert">
@@ -51,7 +59,7 @@ export function LoginPage({ onLoginSuccess }) {
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
-            <label htmlFor="email">Institutional email</label>
+            <label htmlFor="email">Correo institucional</label>
             <div
               className={`auth-input-wrap${showEmailError ? " auth-input-wrap--error" : ""}`}
             >
@@ -60,7 +68,7 @@ export function LoginPage({ onLoginSuccess }) {
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="user@institution.edu"
+                placeholder="usuario@institucion.edu"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 onBlur={() => setEmailTouched(true)}
@@ -75,20 +83,20 @@ export function LoginPage({ onLoginSuccess }) {
             </div>
             {showEmailError && (
               <p id="email-error" className="auth-error" role="alert">
-                Invalid email
+                Ingresa un correo electrónico válido.
               </p>
             )}
           </div>
 
           <div className="auth-field">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Contraseña</label>
             <div className="auth-input-wrap">
               <input
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
-                placeholder="Enter your password"
+                placeholder="Ingresa tu contraseña"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -96,20 +104,20 @@ export function LoginPage({ onLoginSuccess }) {
                 type="button"
                 className="auth-toggle-password"
                 onClick={() => setShowPassword((current) => !current)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? "Ocultar" : "Mostrar"}
               </button>
             </div>
           </div>
 
           <button type="submit" className="auth-submit">
-            Sign in
+            Iniciar sesión
           </button>
         </form>
 
-        <div className="auth-divider" role="separator" aria-label="Or continue with">
-          <span>or</span>
+        <div className="auth-divider" role="separator" aria-label="O continúa con">
+          <span>o</span>
         </div>
 
         <GoogleSignInButton
@@ -119,7 +127,7 @@ export function LoginPage({ onLoginSuccess }) {
       </section>
 
       <footer className="auth-footer">
-        Mayor de San Simón University — Department of Systems and Informatics
+        Universidad Mayor de San Simón — Departamento de Sistemas e Informática
       </footer>
     </main>
   );

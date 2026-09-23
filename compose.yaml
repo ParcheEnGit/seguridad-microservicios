@@ -22,6 +22,27 @@ services:
     networks: [backend]
     restart: unless-stopped
 
+  database-migrations:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./infra/postgres/migrations:/migrations:ro
+    command:
+      [
+        "/bin/sh",
+        "-ec",
+        "for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB -f \"$$migration\"; done",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    restart: "no"
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.3
     command: start-dev --import-realm
@@ -95,9 +116,10 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
+      LOCAL_PASSWORD_LOGIN_ENABLED: ${LOCAL_PASSWORD_LOGIN_ENABLED}
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-migrations:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -118,9 +140,11 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: device-service
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-migrations:
+        condition: service_completed_successfully
     networks: [backend]
     restart: unless-stopped
 
@@ -130,8 +154,8 @@ services:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: telemetry-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-migrations:
+        condition: service_completed_successfully
     networks: [backend]
     restart: unless-stopped
 
@@ -141,8 +165,8 @@ services:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: alert-ticket-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-migrations:
+        condition: service_completed_successfully
     networks: [backend]
     restart: unless-stopped
 
@@ -152,8 +176,8 @@ services:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: report-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-migrations:
+        condition: service_completed_successfully
     networks: [backend]
     restart: unless-stopped
 
