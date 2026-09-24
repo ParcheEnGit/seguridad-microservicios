@@ -4,6 +4,7 @@ import { PlaceholderCard } from "../components/dashboard/PlaceholderCard.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { canRegisterDevice, isAdmin } from "../constants/roles.js";
 import { DevicesPage } from "./DevicesPage.jsx";
+import { AdminDashboard } from "../components/dashboard/AdminDashboard.jsx";
 
 const STAT_CARDS = [
   "Dispositivos activos",
@@ -22,7 +23,7 @@ export function DashboardPage({ user, onLogout }) {
       onNavigate={setActiveItem}
       onLogout={onLogout}
     >
-      {activeItem === "dispositivos" ? <DevicesPage user={user} /> : <>
+      {activeItem === "dispositivos" ? <DevicesPage user={user} /> : activeItem === "inicio" && isAdmin(user.role) ? <AdminDashboard onNavigate={setActiveItem} /> : <>
       <section className="dashboard-grid dashboard-grid--stats" aria-label="Resumen">
         {STAT_CARDS.map((title) => (
           <PlaceholderCard key={title} title={title} />
