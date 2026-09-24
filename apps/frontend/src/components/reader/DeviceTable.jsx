@@ -1,10 +1,22 @@
 import React from "react";
+import { Monitor } from "lucide-react";
 
 export function DeviceTable({ devices }) {
   if (devices.length === 0) {
     return (
       <div className="reader-empty-state">
+        <Monitor
+          className="reader-empty-state__icon"
+          size={32}
+          strokeWidth={1.7}
+          aria-hidden="true"
+        />
+
         <p>No hay dispositivos disponibles.</p>
+
+        <span>
+          Cuando se registren dispositivos, podrás ver su estado aquí.
+        </span>
       </div>
     );
   }
@@ -15,35 +27,37 @@ export function DeviceTable({ devices }) {
         <thead>
           <tr>
             <th>Dispositivo</th>
-            <th>Laboratorio</th>
+            <th>Tipo</th>
+            <th>Ubicación</th>
             <th>Estado</th>
-            <th>Temperatura</th>
-            <th>Humedad</th>
+            <th>Umbrales</th>
           </tr>
         </thead>
 
         <tbody>
           {devices.map((device) => (
             <tr key={device.id}>
-              <td>{device.name}</td>
-              <td>{device.laboratory}</td>
+              <td>
+                <strong>{device.name}</strong>
+
+                <span className="reader-device-code">
+                  {device.device_code}
+                </span>
+              </td>
+
+              <td>{device.device_type}</td>
+
+              <td>{device.location}</td>
+
               <td>
                 <span
                   className={`reader-status reader-status--${device.status}`}
                 >
-                  {device.status === "active" ? "Activo" : "Inactivo"}
+                  {device.status}
                 </span>
               </td>
-              <td>
-                {device.temperature != null
-                  ? `${device.temperature} °C`
-                  : "Sin datos"}
-              </td>
-              <td>
-                {device.humidity != null
-                  ? `${device.humidity} %`
-                  : "Sin datos"}
-              </td>
+
+              <td>{device.thresholds?.length ?? 0}</td>
             </tr>
           ))}
         </tbody>

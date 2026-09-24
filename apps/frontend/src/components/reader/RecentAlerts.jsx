@@ -1,10 +1,22 @@
 import React from "react";
+import { Bell } from "lucide-react";
 
 export function RecentAlerts({ alerts }) {
   if (alerts.length === 0) {
     return (
       <div className="reader-empty-state">
+        <Bell
+          className="reader-empty-state__icon"
+          size={32}
+          strokeWidth={1.7}
+          aria-hidden="true"
+        />
+
         <p>No hay alertas recientes.</p>
+
+        <span>
+          Las alertas activas aparecerán aquí.
+        </span>
       </div>
     );
   }
