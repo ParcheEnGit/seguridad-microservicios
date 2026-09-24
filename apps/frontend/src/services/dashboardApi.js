@@ -1,8 +1,7 @@
-const DEVICE_API_URL = "/api/devices";
-const ALERT_API_URL = "/api/alerts-tickets";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
-async function requestJson(url) {
-  const response = await fetch(url, {
+async function requestJson(path) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -10,17 +9,17 @@ async function requestJson(url) {
     },
   });
 
+  const data = await response.json().catch(() => ({}));
+
   if (!response.ok) {
-    throw new Error(`Error al consultar ${url}: ${response.status}`);
+    throw new Error(
+      data.detail ?? `Error al consultar ${path}: ${response.status}`,
+    );
   }
 
-  return response.json();
-}
-
-export async function fetchDevices() {
-  return requestJson(`${DEVICE_API_URL}/`);
+  return data;
 }
 
 export async function fetchAlerts() {
-  return requestJson(`${ALERT_API_URL}/alerts`);
+  return requestJson("/alerts-tickets/alerts");
 }

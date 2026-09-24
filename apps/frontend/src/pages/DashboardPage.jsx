@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
-import { PlaceholderCard } from "../components/dashboard/PlaceholderCard.jsx";
+import {
+  Bell,
+  Database,
+  Monitor,
+  TrendingUp,
+} from "lucide-react";
+
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
-import { SummaryCard } from "../components/reader/SummaryCard.jsx";
 import { DeviceTable } from "../components/reader/DeviceTable.jsx";
 import { RecentAlerts } from "../components/reader/RecentAlerts.jsx";
-import { canRegisterDevice, isAdmin } from "../constants/roles.js";
-import { fetchAlerts, fetchDevices } from "../services/dashboardApi.js";
+import { SummaryCard } from "../components/reader/SummaryCard.jsx";
+import { isAdmin } from "../constants/roles.js";
+import { fetchAlerts } from "../services/dashboardApi.js";
+import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
-
-const STAT_CARDS = [
-  "Dispositivos activos",
-  "Alertas activas",
-  "Tickets abiertos",
-  "Lecturas hoy",
-];
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -31,14 +30,27 @@ export function DashboardPage({ user, onLogout }) {
         setIsLoading(true);
         setError(null);
 
-        const [deviceData, alertData] = await Promise.all([
-          fetchDevices(),
+        const [deviceResult, alertResult] = await Promise.allSettled([
+          listDevices(),
           fetchAlerts(),
         ]);
 
         if (isMounted) {
-          setDevices(deviceData);
-          setAlerts(alertData);
+          if (deviceResult.status === "fulfilled") {
+            setDevices(deviceResult.value.items ?? []);
+          } else {
+            throw deviceResult.reason;
+          }
+
+          if (alertResult.status === "fulfilled") {
+            const alertData = alertResult.value;
+
+            setAlerts(
+              Array.isArray(alertData) ? alertData : (alertData.items ?? []),
+            );
+          } else {
+            setAlerts([]);
+          }
         }
       } catch (err) {
         if (isMounted) {
@@ -58,6 +70,14 @@ export function DashboardPage({ user, onLogout }) {
     };
   }, []);
 
+  const activeDevices = devices.filter(
+    (device) => device.status === "activo",
+  ).length;
+
+  const activeAlerts = alerts.filter(
+    (alert) => alert.status !== "resuelta",
+  ).length;
+
   return (
     <DashboardLayout
       user={user}
@@ -68,45 +88,130 @@ export function DashboardPage({ user, onLogout }) {
       {activeItem === "dispositivos" ? (
         <DevicesPage user={user} />
       ) : (
-        <>
+        <div className="reader-dashboard">
+          <header className="reader-dashboard__header">
+            <p className="reader-dashboard__eyebrow">
+              Dashboard Lector
+            </p>
+
+            <h1>Resumen general</h1>
+
+            <p className="reader-dashboard__subtitle">
+              Estado general de los dispositivos y eventos del laboratorio.
+            </p>
+          </header>
+
           <section
             className="dashboard-grid dashboard-grid--stats"
-            aria-label="Resumen"
+            aria-label="Resumen del laboratorio"
           >
-            {STAT_CARDS.map((title) => (
-              <PlaceholderCard key={title} title={title} />
-            ))}
+            <SummaryCard
+              title="Dispositivos activos"
+              value={isLoading ? "..." : activeDevices}
+              description="Dispositivos disponibles para monitoreo"
+              icon={Monitor}
+              variant="green"
+            />
+
+            <SummaryCard
+              title="Alertas activas"
+              value={isLoading ? "..." : activeAlerts}
+              description="Alertas que requieren seguimiento"
+              icon={Bell}
+              variant="red"
+            />
+
+            <SummaryCard
+              title="Total dispositivos"
+              value={isLoading ? "..." : devices.length}
+              description="Dispositivos registrados"
+              icon={Database}
+              variant="blue"
+            />
+
+            <SummaryCard
+              title="Alertas recientes"
+              value={isLoading ? "..." : alerts.length}
+              description="Alertas disponibles para consulta"
+              icon={TrendingUp}
+              variant="purple"
+            />
           </section>
 
-          <section
-            className="dashboard-grid dashboard-grid--main"
-            aria-label="Contenido principal"
-          >
-            <PlaceholderCard title="Temperatura y humedad — Últimas 24h" />
+          {isLoading && (
+            <section className="reader-state" aria-live="polite">
+              <p>Cargando información del dashboard...</p>
+            </section>
+          )}
 
-            <div className="dashboard-side-stack">
-              <PlaceholderCard title="Alertas recientes" />
+          {error && (
+            <section
+              className="reader-state reader-state--error"
+              role="alert"
+            >
+              <p>No se pudo cargar el dashboard: {error}</p>
+            </section>
+          )}
 
-              {canRegisterDevice(user.role) && (
-                <button
-                  type="button"
-                  className="dashboard-outline-btn"
-                  disabled
-                >
-                  <Plus size={18} aria-hidden="true" />
-                  Registrar dispositivo
-                </button>
-              )}
-            </div>
-          </section>
+          {!isLoading && !error && (
+            <section
+              className="dashboard-grid dashboard-grid--main"
+              aria-label="Información de monitoreo"
+            >
+              <div className="reader-panel">
+                <div className="reader-panel__header">
+                  <div>
+                    <h2>Dispositivos monitoreados</h2>
+                    <p>
+                      Estado actual de los dispositivos del laboratorio.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="reader-panel__link"
+                    onClick={() => setActiveItem("dispositivos")}
+                  >
+                    Ver todos
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+
+                <DeviceTable devices={devices} />
+              </div>
+
+              <div className="reader-panel">
+                <div className="reader-panel__header">
+                  <div>
+                    <h2>Alertas recientes</h2>
+                    <p>
+                      Últimos eventos detectados en el laboratorio.
+                    </p>
+                  </div>
+                </div>
+
+                <RecentAlerts alerts={alerts} />
+              </div>
+            </section>
+          )}
 
           {!isAdmin(user.role) && (
-            <p className="dashboard-role-note">
-              Dashboard Lector. Puedes consultar información autorizada y
-              registrar tickets; la gestión administrativa está restringida.
-            </p>
+            <div className="reader-role-banner">
+              <span
+                className="reader-role-banner__icon"
+                aria-hidden="true"
+              >
+                i
+              </span>
+
+              <p>
+                <strong>Dashboard Lector.</strong>{" "}
+                Puedes consultar información autorizada y registrar tickets;
+                la gestión administrativa está restringida.
+              </p>
+            </div>
           )}
-        </>
+        </div>
       )}
     </DashboardLayout>
   );
