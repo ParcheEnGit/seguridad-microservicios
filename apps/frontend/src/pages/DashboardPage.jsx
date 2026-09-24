@@ -6,6 +6,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { AdminDashboard } from "../components/dashboard/AdminDashboard.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { DeviceTable } from "../components/reader/DeviceTable.jsx";
 import { RecentAlerts } from "../components/reader/RecentAlerts.jsx";
@@ -87,6 +88,8 @@ export function DashboardPage({ user, onLogout }) {
     >
       {activeItem === "dispositivos" ? (
         <DevicesPage user={user} />
+      ) : activeItem === "inicio" && isAdmin(user.role) ? (
+        <AdminDashboard onNavigate={setActiveItem} />
       ) : (
         <div className="reader-dashboard">
           <header className="reader-dashboard__header">
