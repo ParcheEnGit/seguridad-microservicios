@@ -1,6 +1,19 @@
 import React from "react";
 import { Bell } from "lucide-react";
 
+function formatAlertDate(date) {
+  if (!date) return "";
+
+  return new Date(date).toLocaleString("es-BO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/La_Paz",
+  });
+}
+
 export function RecentAlerts({ alerts }) {
   if (alerts.length === 0) {
     return (
@@ -14,9 +27,7 @@ export function RecentAlerts({ alerts }) {
 
         <p>No hay alertas recientes.</p>
 
-        <span>
-          Las alertas activas aparecerán aquí.
-        </span>
+        <span>Las alertas activas aparecerán aquí.</span>
       </div>
     );
   }
@@ -35,12 +46,10 @@ export function RecentAlerts({ alerts }) {
             </span>
           </div>
 
-          <p className="reader-alert__device">
-            {alert.deviceName}
-          </p>
+          <p className="reader-alert__device">{alert.deviceName}</p>
 
           <span className="reader-alert__date">
-            {alert.date}
+            {formatAlertDate(alert.date)}
           </span>
         </article>
       ))}
