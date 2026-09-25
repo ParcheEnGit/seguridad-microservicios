@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Sidebar } from "./Sidebar.jsx";
 import { Topbar } from "./Topbar.jsx";
 
@@ -9,17 +9,37 @@ export function DashboardLayout({
   onLogout,
   children,
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  function navigate(item) {
+    onNavigate(item);
+    setMobileMenuOpen(false);
+  }
+
   return (
     <div className="dashboard-shell">
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="dashboard-menu-backdrop"
+          aria-label="Cerrar menú"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
       <Sidebar
         user={user}
         activeItem={activeItem}
-        onNavigate={onNavigate}
+        onNavigate={navigate}
         onLogout={onLogout}
+        isMobileOpen={mobileMenuOpen}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
       />
 
       <div className="dashboard-main">
-        <Topbar />
+        <Topbar
+          isMobileMenuOpen={mobileMenuOpen}
+          onToggleMobileMenu={() => setMobileMenuOpen((current) => !current)}
+        />
         <main className="dashboard-content">{children}</main>
       </div>
     </div>
