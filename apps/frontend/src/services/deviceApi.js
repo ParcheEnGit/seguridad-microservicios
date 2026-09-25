@@ -11,7 +11,14 @@ async function request(path, options = {}) {
   return data;
 }
 
-export const listDevices = () => request("/devices");
+export function listDevices(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") params.set(key, value);
+  });
+  const query = params.toString();
+  return request(`/devices${query ? `?${query}` : ""}`);
+}
 export const createDevice = (payload) => request("/devices", { method: "POST", body: JSON.stringify(payload) });
 export const updateDevice = (id, payload) => request(`/devices/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
 export const deactivateDevice = (id) => request(`/devices/${id}/deactivate`, { method: "PATCH", body: JSON.stringify({ status: "inactivo" }) });
