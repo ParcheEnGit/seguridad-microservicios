@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit3, Eye, Plus, Power, Search, SlidersHorizontal, Thermometer, X } from "lucide-react";
+import { Edit3, Eye, MoreVertical, Plus, Power, Router, Search, Server, SlidersHorizontal, Thermometer, X } from "lucide-react";
 import { canRegisterDevice } from "../constants/roles.js";
 import { createDevice, deactivateDevice, listDevices, replaceThresholds, updateDevice } from "../services/deviceApi.js";
+import { fetchAlerts } from "../services/dashboardApi.js";
 
 const PAGE_SIZE = 10;
 const EMPTY_DEVICE = { device_code: "", name: "", device_type: "", location: "", status: "activo" };
@@ -13,22 +14,32 @@ function Modal({ title, subtitle, children, onClose }) {
 
 function DeviceFormModal({ device, onClose, onSaved }) {
   const [form, setForm] = useState(device ? { ...device } : EMPTY_DEVICE);
+  const [includeThresholds, setIncludeThresholds] = useState(false);
+  const [thresholds, setThresholds] = useState([{ ...EMPTY_THRESHOLD }]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const editing = Boolean(device);
   const change = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
 
   async function submit(event) {
-    event.preventDefault(); setSaving(true); setError("");
+    event.preventDefault();
+    setError("");
     const payload = { name: form.name.trim(), device_type: form.device_type.trim(), location: form.location.trim(), status: form.status };
+    const formattedThresholds = thresholds.map(({ metric_code, unit, min_value, max_value }) => ({ metric_code: metric_code.trim().toLowerCase(), unit: unit.trim(), min_value: Number(min_value), max_value: Number(max_value) }));
+    if (!editing && includeThresholds && formattedThresholds.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) {
+      setError("Completa los valores de cada umbral o desactiva la configuración inicial.");
+      return;
+    }
+    setSaving(true);
     try {
       if (editing) await updateDevice(device.id, payload);
-      else await createDevice({ ...payload, device_code: form.device_code.trim().toUpperCase(), thresholds: [] });
+      else await createDevice({ ...payload, device_code: form.device_code.trim().toUpperCase(), thresholds: includeThresholds ? formattedThresholds : [] });
       await onSaved();
     } catch (requestError) { setError(requestError.message); } finally { setSaving(false); }
   }
 
-  return <Modal title={editing ? `Editar dispositivo — ${device.device_code}` : "Registrar dispositivo"} subtitle="Registra la información base del equipo. Los umbrales se configuran después." onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-form-grid"><label>Código único<input required disabled={editing} value={form.device_code} onChange={(event) => change("device_code", event.target.value)} placeholder="ROUTER-LAB-01" /></label><label>Nombre del dispositivo<input required value={form.name} onChange={(event) => change("name", event.target.value)} placeholder="Router-LAB-01" /></label><label>Tipo de dispositivo<input required value={form.device_type} onChange={(event) => change("device_type", event.target.value)} placeholder="Router, sensor o switch" /></label><label>Laboratorio o ubicación<input required value={form.location} onChange={(event) => change("location", event.target.value)} placeholder="Lab-A" /></label>{editing && <label>Estado<select value={form.status} onChange={(event) => change("status", event.target.value)}><option value="activo">Activo</option><option value="mantenimiento">Mantenimiento</option><option value="inactivo">Inactivo</option></select></label>}</div><div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button></div></form></Modal>;
+  return <Modal title={editing ? `Editar dispositivo — ${device.device_code}` : "Registrar dispositivo"} subtitle={editing ? "Actualiza la información base del equipo." : "Registra el equipo y, si lo deseas, deja sus umbrales listos desde ahora."} onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-form-grid"><label>Código único<input required disabled={editing} value={form.device_code} onChange={(event) => change("device_code", event.target.value)} placeholder="ROUTER-LAB-01" /></label><label>Nombre del dispositivo<input required value={form.name} onChange={(event) => change("name", event.target.value)} placeholder="Router-LAB-01" /></label><label>Tipo de dispositivo<input required value={form.device_type} onChange={(event) => change("device_type", event.target.value)} placeholder="Router, sensor o switch" /></label><label>Laboratorio o ubicación<input required value={form.location} onChange={(event) => change("location", event.target.value)} placeholder="Lab-A" /></label>{editing && <label>Estado<select value={form.status} onChange={(event) => change("status", event.target.value)}><option value="activo">Activo</option><option value="mantenimiento">Mantenimiento</option><option value="inactivo">Inactivo</option></select></label>}</div>{!editing && <section className="device-initial-thresholds"><label className="device-initial-thresholds__toggle"><input type="checkbox" checked={includeThresholds} onChange={(event) => setIncludeThresholds(event.target.checked)} /><span><strong>Configurar umbrales ahora</strong><small>Opcional. Puedes definir los rangos de monitoreo antes de registrar el dispositivo.</small></span></label>{includeThresholds && <div className="device-threshold-grid">{thresholds.map((threshold, index) => <div className="device-threshold-card" key={`${threshold.metric_code}-${index}`}><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong>{thresholds.length > 1 && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button>}</div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => updateThreshold(index, "metric_code", event.target.value)} placeholder="temperatura" /></label><label>Unidad<input required value={threshold.unit} onChange={(event) => updateThreshold(index, "unit", event.target.value)} placeholder="°C" /></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => updateThreshold(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => updateThreshold(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>)}<button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, { ...EMPTY_THRESHOLD }])}><Plus size={16} /> Añadir otra métrica</button></div>}</section>}<div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : editing ? "Guardar cambios" : "Registrar dispositivo"}</button></div></form></Modal>;
 }
 
 function ThresholdModal({ device, onClose, onSaved }) {
@@ -54,6 +65,23 @@ function DetailModal({ device, admin, onClose, onConfigure }) {
 
 function DeviceActions({ device, admin, onDetail, onEdit, onThresholds, onDeactivate }) {
   return <div className="device-actions"><button type="button" title="Ver detalle" aria-label={`Ver detalle de ${device.name}`} onClick={() => onDetail(device)}><Eye size={17} /></button>{admin && <><button type="button" title="Configurar umbrales" aria-label={`Configurar umbrales de ${device.name}`} onClick={() => onThresholds(device)}><SlidersHorizontal size={16} /></button><button type="button" title="Editar dispositivo" aria-label={`Editar ${device.name}`} onClick={() => onEdit(device)}><Edit3 size={16} /></button>{device.status !== "inactivo" && <button type="button" title="Desactivar dispositivo" className="device-action-danger" aria-label={`Desactivar ${device.name}`} onClick={() => onDeactivate(device)}><Power size={16} /></button>}</>}</div>;
+}
+
+function DeviceTypeIcon({ type }) {
+  const normalizedType = type.toLowerCase();
+  if (normalizedType.includes("sensor")) return <Thermometer size={16} />;
+  if (normalizedType.includes("router")) return <Router size={16} />;
+  return <Server size={16} />;
+}
+
+function formatUpdatedAt(timestamp) {
+  if (!timestamp) return "Sin lectura reciente";
+  return `Actualizado ${new Intl.DateTimeFormat("es-BO", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp))}`;
+}
+
+function MobileDeviceCard({ device, actionProps }) {
+  const [showActions, setShowActions] = useState(false);
+  return <article className="device-mobile-card"><div className="device-mobile-card__header"><span className="device-mobile-card__icon"><DeviceTypeIcon type={device.device_type} /></span><div><strong>{device.name}</strong><p><span>{device.device_type}</span><span>{device.location}</span></p></div><div className="device-mobile-card__menu"><button type="button" aria-label={`Acciones para ${device.name}`} onClick={() => setShowActions((current) => !current)}><MoreVertical size={18} /></button>{showActions && <div className="device-mobile-card__popover"><DeviceActions device={device} {...actionProps} /></div>}</div></div><footer className="device-mobile-card__footer"><small>{formatUpdatedAt(device.updated_at)}</small><span className={`device-status device-status--${device.status}`}>{device.status}</span></footer></article>;
 }
 
 export function DevicesPage({ user }) {
