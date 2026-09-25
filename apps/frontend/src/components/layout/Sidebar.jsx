@@ -1,19 +1,22 @@
 import React from "react";
-import { Shield } from "lucide-react";
+import { Shield, X } from "lucide-react";
 import { getNavItemsForRole } from "../../constants/navigation.js";
 import { UserAvatar } from "../common/UserAvatar.jsx";
 import { getRoleLabelForDisplay } from "../../utils/userDisplay.js";
 
-export function Sidebar({ user, activeItem, onNavigate, onLogout }) {
+export function Sidebar({ user, activeItem, onNavigate, onLogout, isMobileOpen, onCloseMobileMenu }) {
   const navItems = getNavItemsForRole(user.role);
 
   return (
-    <aside className="dashboard-sidebar" aria-label="Navegación principal">
+    <aside className={`dashboard-sidebar${isMobileOpen ? " dashboard-sidebar--mobile-open" : ""}`} aria-label="Navegación principal">
       <div className="dashboard-sidebar__brand">
         <div className="dashboard-sidebar__logo" aria-hidden="true">
           <Shield size={18} strokeWidth={2.2} />
         </div>
         <span>LabSentinel</span>
+        <button type="button" className="dashboard-sidebar__close" onClick={onCloseMobileMenu} aria-label="Cerrar menú">
+          <X size={20} />
+        </button>
       </div>
 
       <nav className="dashboard-sidebar__nav">
