@@ -24,6 +24,7 @@ def get_device_or_404(device_id: uuid.UUID, db: Session) -> Device:
 @router.get("", response_model=DeviceListResponse, summary="Listar dispositivos")
 def list_devices(
     status_filter: str | None = Query(default=None, alias="status"),
+    device_type: str | None = Query(default=None, min_length=1, max_length=60),
     location: str | None = Query(default=None, min_length=1, max_length=120),
     search: str | None = Query(default=None, min_length=1, max_length=120),
     limit: int = Query(default=25, ge=1, le=100),
@@ -36,6 +37,8 @@ def list_devices(
     filters = []
     if status_filter:
         filters.append(Device.status == status_filter)
+    if device_type:
+        filters.append(Device.device_type.ilike(f"%{device_type.strip()}%"))
     if location:
         filters.append(Device.location.ilike(f"%{location.strip()}%"))
     if search:
