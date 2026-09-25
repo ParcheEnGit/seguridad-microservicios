@@ -1611,6 +1611,41 @@
   gap: 12px;
 }
 
+.device-initial-thresholds {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e7eeea;
+}
+
+.device-initial-thresholds__toggle {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.device-initial-thresholds__toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: #0b5a3b;
+}
+
+.device-initial-thresholds__toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.device-initial-thresholds__toggle small {
+  color: #718079;
+  font-size: .77rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .device-threshold-card {
   padding: 13px;
   border: 1px solid #e0eae4;
