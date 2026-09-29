@@ -12,3 +12,4 @@ async function request(path) {
 }
 
 export const getAdminSummary = () => request("/dashboard/admin-summary");
+export const getTelemetrySummary = () => request("/dashboard/telemetry-summary");
