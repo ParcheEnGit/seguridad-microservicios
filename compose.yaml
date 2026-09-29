@@ -148,6 +148,12 @@ services:
     depends_on:
       database-migrations:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks: [backend]
     restart: unless-stopped
 
@@ -156,9 +162,17 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: telemetry-service
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
     depends_on:
       database-migrations:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks: [backend]
     restart: unless-stopped
 
@@ -192,12 +206,14 @@ services:
     build: ./services/simulator-device
     environment:
       APP_ENV: ${APP_ENV}
-      TELEMETRY_URL: http://telemetry-service:8000/health
+      TELEMETRY_URL: http://telemetry-service:8000
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
+      SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-15}
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
     depends_on:
       telemetry-service:
-        condition: service_started
+        condition: service_healthy
     networks: [backend]
-    profiles: [simulator]
 
 networks:
   frontend:
