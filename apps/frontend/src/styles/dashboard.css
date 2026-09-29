@@ -1329,9 +1329,34 @@
 }
 
 .admin-chart {
-  flex: 1;
   width: 100%;
   height: 300px;
+}
+
+.admin-chart-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 0 2px 3px;
+  color: #66776e;
+  font-size: .76rem;
+}
+
+.admin-chart-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-chart-summary i {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
 }
 
 .admin-chart__grid {
@@ -1345,14 +1370,11 @@
   font-size: 11px;
 }
 
-.admin-chart__hit {
-  fill: transparent;
-  cursor: default;
-}
-
-.admin-chart__hit:hover {
-  fill: rgba(0, 0, 0, .06);
-}
+.admin-chart__point { cursor: crosshair; stroke: #fff; stroke-width: 1.5; }
+.admin-chart__guide { stroke: #93a79c; stroke-width: 1; stroke-dasharray: 3 4; }
+.admin-chart__tooltip rect { fill: #173a2b; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .18)); }
+.admin-chart__tooltip-title { fill: #fff; font-size: 12px; font-weight: 700; }
+.admin-chart__tooltip-time { fill: #c8d9d0; font-size: 10px; }
 
 .admin-empty {
   display: flex;
