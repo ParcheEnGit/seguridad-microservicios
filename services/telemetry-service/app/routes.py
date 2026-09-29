@@ -36,7 +36,13 @@ INSERT_READING_SQL = text("""
 """)
 
 TARGETS_SQL = text("""
-    SELECT d.id AS device_id, d.device_code, t.metric_code, t.unit,
+    SELECT d.id AS device_id, d.device_code,
+           NOT EXISTS (
+               SELECT 1 FROM telemetry_service.readings r
+               WHERE r.device_id = d.id
+                 AND r.recorded_at < NOW() - INTERVAL '6 hours'
+           ) AS needs_history,
+           t.metric_code, t.unit,
            t.min_value::float, t.max_value::float
     FROM device_service.devices d
     LEFT JOIN device_service.thresholds t ON t.device_id = d.id
@@ -101,7 +107,12 @@ def simulation_targets(
     for row in db.execute(TARGETS_SQL).mappings():
         key = str(row["device_id"])
         if key not in targets:
-            targets[key] = SimulationTarget(device_id=row["device_id"], device_code=row["device_code"], metrics=[])
+            targets[key] = SimulationTarget(
+                device_id=row["device_id"],
+                device_code=row["device_code"],
+                needs_history=row["needs_history"],
+                metrics=[],
+            )
         if row["metric_code"]:
             targets[key].metrics.append(
                 SimulationMetric(
