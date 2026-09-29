@@ -44,4 +44,5 @@ class SimulationMetric(BaseModel):
 class SimulationTarget(BaseModel):
     device_id: UUID
     device_code: str
+    needs_history: bool = False
     metrics: list[SimulationMetric]
