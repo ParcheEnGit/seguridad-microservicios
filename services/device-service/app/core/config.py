@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     cookie_name: str = "labsentinel_session"
+    device_images_path: str = "/data/device-images"
 
 
 @lru_cache
