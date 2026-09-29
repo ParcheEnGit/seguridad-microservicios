@@ -1849,6 +1849,23 @@
   font-size: .84rem;
 }
 
+.reader-telemetry-panel {
+  margin-top: 22px;
+  padding-bottom: 14px;
+}
+
+.reader-telemetry-panel .admin-chart {
+  display: block;
+  height: 260px;
+  padding: 12px 20px 0;
+}
+
+.reader-telemetry-panel__count {
+  color: #0b5a3b;
+  font-size: .8rem;
+  font-weight: 750;
+}
+
 .device-gallery {
   border: 1px solid #e0eae4;
   border-radius: 12px;
