@@ -1650,6 +1650,96 @@
   line-height: 1.35;
 }
 
+.device-photo-upload {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e7eeea;
+}
+
+.device-photo-upload > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.device-photo-upload small {
+  color: #718079;
+  font-size: .77rem;
+}
+
+.device-photo-upload__button {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #0b5a3b;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #0b5a3b !important;
+  font-size: .8rem !important;
+  cursor: pointer;
+}
+
+.device-photo-upload__button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.device-photo-preview {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 9px;
+  overflow-x: auto;
+  padding-top: 2px;
+}
+
+.device-photo-preview figure {
+  position: relative;
+  width: 86px;
+  flex: 0 0 86px;
+  margin: 0;
+}
+
+.device-photo-preview img {
+  display: block;
+  width: 86px;
+  height: 64px;
+  border: 1px solid #dce7e0;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.device-photo-preview button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: #a02626;
+  color: #fff;
+  cursor: pointer;
+}
+
+.device-photo-preview figcaption {
+  overflow: hidden;
+  margin-top: 4px;
+  color: #718079;
+  font-size: .66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .device-threshold-card {
   padding: 13px;
   border: 1px solid #e0eae4;
@@ -1841,6 +1931,13 @@
     color: #16704a;
   }
 
+  .device-mobile-card__icon img {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    object-fit: cover;
+  }
+
   .device-mobile-card strong {
     display: block;
     color: #1f2937;
@@ -1954,5 +2051,10 @@
 
   .device-modal__header {
     padding: 18px 16px 14px;
+  }
+
+  .device-photo-upload {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 }
