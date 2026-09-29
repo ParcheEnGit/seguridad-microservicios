@@ -60,6 +60,16 @@ class ThresholdResponse(ThresholdInput):
     updated_at: datetime
 
 
+class DevicePhotoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    original_name: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+    url: str
+
+
 class DeviceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: uuid.UUID
@@ -72,6 +82,7 @@ class DeviceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     thresholds: list[ThresholdResponse] = []
+    photos: list[DevicePhotoResponse] = []
 
 
 class DeviceListResponse(BaseModel):
