@@ -1,8 +1,10 @@
 import uuid
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -141,6 +143,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": (".webp", b"RIFF"),
 }
 MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+MAX_PHOTOS_PER_DEVICE = 3
 
 
 def is_valid_image(content_type: str, content: bytes) -> bool:
@@ -153,6 +156,19 @@ def is_valid_image(content_type: str, content: bytes) -> bool:
     )
 
 
+def convert_to_webp(content: bytes) -> bytes:
+    try:
+        with Image.open(BytesIO(content)) as image:
+            image.load()
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+            output = BytesIO()
+            image.save(output, format="WEBP", quality=82, method=6)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La fotografía no contiene una imagen válida") from exc
+
+
 @router.post("/{device_id}/photos", response_model=DevicePhotoResponse, status_code=status.HTTP_201_CREATED, summary="Agregar fotografía a un dispositivo")
 async def upload_device_photo(
     device_id: uuid.UUID,
@@ -162,22 +178,27 @@ async def upload_device_photo(
     _: dict = Depends(require_admin),
 ) -> DevicePhoto:
     device = get_device_or_404(device_id, db)
+    photo_count = db.scalar(select(func.count(DevicePhoto.id)).where(DevicePhoto.device_id == device.id)) or 0
+    if photo_count >= MAX_PHOTOS_PER_DEVICE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cada dispositivo admite como máximo 3 fotografías")
     content = await photo.read(MAX_IMAGE_SIZE_BYTES + 1)
     content_type = photo.content_type or ""
     if not content or len(content) > MAX_IMAGE_SIZE_BYTES or not is_valid_image(content_type, content):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La fotografía debe ser JPEG, PNG o WebP válida y no superar 5 MB")
-    extension = ALLOWED_IMAGE_TYPES[content_type][0]
-    storage_name = f"{uuid.uuid4()}{extension}"
+    webp_content = convert_to_webp(content)
+    if not webp_content or len(webp_content) > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo optimizar la fotografía dentro del límite permitido")
+    storage_name = f"{uuid.uuid4()}.webp"
     images_path = Path(settings.device_images_path)
     images_path.mkdir(parents=True, exist_ok=True)
     file_path = images_path / storage_name
-    file_path.write_bytes(content)
+    file_path.write_bytes(webp_content)
     record = DevicePhoto(
         device_id=device.id,
         storage_name=storage_name,
         original_name=Path(photo.filename or "fotografia").name[:255],
-        content_type=content_type,
-        size_bytes=len(content),
+        content_type="image/webp",
+        size_bytes=len(webp_content),
     )
     db.add(record)
     try:
