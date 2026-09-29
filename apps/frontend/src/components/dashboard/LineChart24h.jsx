@@ -35,12 +35,23 @@ export function LineChart24h({ points }) {
   const ticks = Array.from({ length: 7 }, (_, index) => start + (index * 24 * HOUR_MS) / 6);
   const tooltipX = hovered ? Math.min(Math.max(hovered.cx - 82, PAD.left), WIDTH - PAD.right - 164) : 0;
   const tooltipY = hovered ? Math.max(hovered.cy - 72, PAD.top) : 0;
+  const selectNearest = (event, line) => {
+    const bounds = event.currentTarget.ownerSVGElement.getBoundingClientRect();
+    const pointerX = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
+    const pointerY = ((event.clientY - bounds.top) / bounds.height) * HEIGHT;
+    const value = line.values.reduce((nearest, current) => {
+      const nearestDistance = (nearest.cx - pointerX) ** 2 + (nearest.cy - pointerY) ** 2;
+      const currentDistance = (current.cx - pointerX) ** 2 + (current.cy - pointerY) ** 2;
+      return currentDistance < nearestDistance ? current : nearest;
+    });
+    setHovered({ ...value, key: line.key, label: line.label, unit: line.unit });
+  };
 
   return <div className="admin-chart-wrap"><svg className="admin-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Gráfico interactivo de temperatura y humedad de las últimas 24 horas" preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
     {Array.from({ length: GRID_LINES }, (_, index) => { const gy = PAD.top + (index * innerH) / (GRID_LINES - 1); return <line key={index} x1={PAD.left} x2={WIDTH - PAD.right} y1={gy} y2={gy} className="admin-chart__grid" />; })}
     {ticks.map((tick, index) => <text key={tick} x={x(tick)} y={HEIGHT - 12} className="admin-chart__label" textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{index === ticks.length - 1 ? "Ahora" : formatHour(new Date(tick))}</text>)}
     {hovered && <line x1={hovered.cx} x2={hovered.cx} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}
-    {lines.map((line) => line.values.length > 0 && <g key={line.key}><polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />{line.values.map((value) => <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 4} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}</g>)}
+    {lines.map((line) => line.values.length > 0 && <g key={line.key}><polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /><polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} />{line.values.map((value) => <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 4} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}</g>)}
     {hovered && <g className="admin-chart__tooltip" transform={`translate(${tooltipX} ${tooltipY})`} pointerEvents="none"><rect width="164" height="56" rx="7" /><text x="10" y="20" className="admin-chart__tooltip-title">{hovered.label}: {hovered.value.toFixed(1)} {hovered.unit}</text><text x="10" y="40" className="admin-chart__tooltip-time">{formatDateTime(new Date(hovered.time))}</text></g>}
   </svg><div className="admin-chart-summary" aria-label="Resumen de rangos">{lines.filter((line) => line.values.length).map((line) => <span key={line.key}><i style={{ background: line.color }} />{line.label}: {line.min.toFixed(1)}–{line.max.toFixed(1)} {line.unit}</span>)}</div></div>;
 }
