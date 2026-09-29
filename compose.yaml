@@ -142,6 +142,9 @@ services:
       SERVICE_NAME: device-service
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
+      DEVICE_IMAGES_PATH: /data/device-images
+    volumes:
+      - device_images:/data/device-images
     depends_on:
       database-migrations:
         condition: service_completed_successfully
@@ -204,3 +207,4 @@ networks:
 volumes:
   postgres_data:
   frontend_node_modules:
+  device_images:
