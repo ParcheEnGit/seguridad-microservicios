@@ -1974,6 +1974,10 @@
   padding: 10px 24px 28px;
 }
 
+.device-photo-viewer__canvas.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .device-photo-viewer__canvas img {
   width: 100%;
   max-width: min(1050px, 85vw);
