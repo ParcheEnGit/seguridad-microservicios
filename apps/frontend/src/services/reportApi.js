@@ -12,3 +12,5 @@ async function request(path) {
 }
 
 export const getAdminSummary = () => request("/dashboard/admin-summary");
+export const getTelemetrySummary = () => request("/dashboard/telemetry-summary");
+export const getDeviceTelemetry = ({ period = "24h", resolution = "5m" } = {}) => request(`/dashboard/device-telemetry?period=${period}&resolution=${resolution}`);

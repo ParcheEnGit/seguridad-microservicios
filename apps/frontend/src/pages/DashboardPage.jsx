@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from "react";
 import {
   Bell,
+  BarChart3,
   Database,
   Monitor,
   TrendingUp,
 } from "lucide-react";
 
 import { AdminDashboard } from "../components/dashboard/AdminDashboard.jsx";
+import { LineChart24h } from "../components/dashboard/LineChart24h.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { DeviceTable } from "../components/reader/DeviceTable.jsx";
 import { RecentAlerts } from "../components/reader/RecentAlerts.jsx";
 import { SummaryCard } from "../components/reader/SummaryCard.jsx";
 import { isAdmin } from "../constants/roles.js";
 import { fetchAlerts } from "../services/dashboardApi.js";
+import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
 
@@ -22,6 +25,7 @@ export function DashboardPage({ user, onLogout }) {
   const [alerts, setAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,6 +74,22 @@ export function DashboardPage({ user, onLogout }) {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isAdmin(user.role)) return undefined;
+    let isMounted = true;
+    const loadTelemetry = async () => {
+      try {
+        const summary = await getTelemetrySummary();
+        if (isMounted) setTelemetry(summary);
+      } catch {
+        // El resto del Dashboard Lector continúa disponible si telemetría falla temporalmente.
+      }
+    };
+    loadTelemetry();
+    const timer = setInterval(loadTelemetry, 15 * 1000);
+    return () => { isMounted = false; clearInterval(timer); };
+  }, [user.role]);
 
   const activeDevices = devices.filter(
     (device) => device.status === "activo",
@@ -157,10 +177,8 @@ export function DashboardPage({ user, onLogout }) {
           )}
 
           {!isLoading && !error && (
-            <section
-              className="dashboard-grid dashboard-grid--main"
-              aria-label="Información de monitoreo"
-            >
+            <>
+            <section className="dashboard-grid dashboard-grid--main" aria-label="Información de monitoreo">
               <div className="reader-panel">
                 <div className="reader-panel__header">
                   <div>
@@ -196,6 +214,15 @@ export function DashboardPage({ user, onLogout }) {
                 <RecentAlerts alerts={alerts} />
               </div>
             </section>
+
+            <section className="reader-panel reader-telemetry-panel" aria-label="Telemetría en tiempo real">
+              <div className="reader-panel__header">
+                <div><h2>Telemetría reciente</h2><p>Lecturas simuladas actualizadas cada 15 segundos.</p></div>
+                <span className="reader-telemetry-panel__count">{telemetry ? `${telemetry.readings.today} hoy` : "Cargando..."}</span>
+              </div>
+              {telemetry?.chart_24h?.length ? <LineChart24h points={telemetry.chart_24h} /> : <div className="reader-empty-state"><BarChart3 className="reader-empty-state__icon" size={30} /><p>Aún no hay lecturas disponibles.</p><span>Las lecturas aparecerán cuando el simulador esté habilitado.</span></div>}
+            </section>
+            </>
           )}
 
           {!isAdmin(user.role) && (

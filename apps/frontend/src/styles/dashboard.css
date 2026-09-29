@@ -1329,9 +1329,34 @@
 }
 
 .admin-chart {
-  flex: 1;
   width: 100%;
   height: 300px;
+}
+
+.admin-chart-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 0 2px 3px;
+  color: #66776e;
+  font-size: .76rem;
+}
+
+.admin-chart-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-chart-summary i {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
 }
 
 .admin-chart__grid {
@@ -1345,13 +1370,114 @@
   font-size: 11px;
 }
 
-.admin-chart__hit {
-  fill: transparent;
-  cursor: default;
+.admin-chart__point { cursor: crosshair; stroke: #fff; stroke-width: 1.5; }
+.admin-chart__guide { stroke: #93a79c; stroke-width: 1; stroke-dasharray: 3 4; }
+.admin-chart__tooltip rect { fill: #173a2b; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .18)); }
+.admin-chart__tooltip-title { fill: #fff; font-size: 12px; font-weight: 700; }
+.admin-chart__tooltip-time { fill: #c8d9d0; font-size: 10px; }
+
+.device-telemetry-card {
+  margin-top: 22px;
+  min-height: 390px;
 }
 
-.admin-chart__hit:hover {
-  fill: rgba(0, 0, 0, .06);
+.device-telemetry-card__subtitle {
+  margin: 4px 0 0;
+  color: #718079;
+  font-size: .78rem;
+}
+
+.device-telemetry-card__expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cfe0d7;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+  color: #0b5a3b;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.telemetry-controls {
+  display: grid;
+  gap: 9px;
+  margin: 15px 0 12px;
+}
+
+.telemetry-controls > div,
+.telemetry-devices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.telemetry-controls span {
+  min-width: 74px;
+  color: #64766c;
+  font-size: .73rem;
+  font-weight: 750;
+}
+
+.telemetry-controls button,
+.telemetry-devices button {
+  border: 1px solid #dce7e1;
+  border-radius: 7px;
+  padding: 5px 9px;
+  background: #fff;
+  color: #587067;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.telemetry-controls button.is-active {
+  border-color: #0b5a3b;
+  background: #0b5a3b;
+  color: #fff;
+}
+
+.telemetry-devices {
+  padding: 10px 0;
+  border-top: 1px solid #edf2ef;
+}
+
+.telemetry-devices > span { display: inline-flex; gap: 3px; }
+.telemetry-devices button { display: inline-flex; align-items: center; gap: 5px; }
+.telemetry-devices button.is-visible { border-color: #9ccbb5; color: #174f38; background: #f2faf6; }
+.telemetry-devices i { width: 8px; height: 8px; border-radius: 50%; }
+.telemetry-devices .telemetry-devices__only { padding-inline: 6px; color: #0b5a3b; }
+
+.device-telemetry-chart-wrap { min-height: 275px; }
+.device-telemetry-chart { width: 100%; height: 270px; }
+.device-telemetry-chart__range { margin: 0; color: #6e8077; font-size: .75rem; }
+.telemetry-density-note { margin: 8px 0 0; color: #9a6511; font-size: .75rem; font-weight: 650; }
+.telemetry-loading { vertical-align: -3px; animation: telemetry-spin 1s linear infinite; }
+
+@keyframes telemetry-spin { to { transform: rotate(360deg); } }
+
+.device-telemetry-card--expanded {
+  position: fixed;
+  z-index: 200;
+  inset: 22px;
+  overflow: auto;
+  margin: 0;
+  padding: 24px;
+  background: #fff;
+}
+
+.device-telemetry-card--expanded .device-telemetry-chart-wrap { min-height: calc(100vh - 250px); }
+.device-telemetry-card--expanded .device-telemetry-chart { height: min(62vh, 620px); }
+
+@media (max-width: 700px) {
+  .device-telemetry-card--expanded { inset: 8px; padding: 16px; }
+  .device-telemetry-card__expand { font-size: 0; padding: 8px; }
+  .device-telemetry-card__expand svg { margin: 0; }
 }
 
 .admin-empty {
@@ -1847,6 +1973,23 @@
   gap: 10px;
   color: #718079;
   font-size: .84rem;
+}
+
+.reader-telemetry-panel {
+  margin-top: 22px;
+  padding-bottom: 14px;
+}
+
+.reader-telemetry-panel .admin-chart {
+  display: block;
+  height: 260px;
+  padding: 12px 20px 0;
+}
+
+.reader-telemetry-panel__count {
+  color: #0b5a3b;
+  font-size: .8rem;
+  font-weight: 750;
 }
 
 .device-gallery {

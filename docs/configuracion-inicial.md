@@ -32,7 +32,7 @@ El primer inicio descarga imágenes y puede tardar varios minutos. PostgreSQL cr
 
 El realm `labsentinel` se importa automáticamente al iniciar Keycloak. Ingrese con `KEYCLOAK_ADMIN` y la contraseña de `.env`; después cree los usuarios de prueba. A cada usuario humano asígnele exactamente uno de los roles de realm: `admin` o `lector`.
 
-El cliente `labsentinel-web` está preparado para el frontend local. El cliente `labsentinel-simulator` queda creado para la futura identidad técnica del simulador. Genere y guarde su secreto exclusivamente en `.env` cuando se implemente el envío de lecturas.
+El cliente `labsentinel-web` está preparado para el frontend local. El simulador usa una clave técnica interna definida en `SIMULATOR_API_KEY`; manténgala solo en `.env`. Con `SIMULATOR_ENABLED=true`, genera lecturas para los dispositivos activos cada `SIMULATOR_INTERVAL_SECONDS` segundos. Las lecturas se detienen sin borrar datos al cambiarlo a `false` y reiniciar el servicio.
 
 ## Comandos útiles
 
@@ -41,7 +41,8 @@ docker compose ps
 docker compose logs -f gateway
 docker compose logs -f keycloak
 docker compose down
-docker compose --profile simulator up --build
+docker compose logs -f simulator-device
+docker compose up -d --build simulator-device telemetry-service report-service
 ```
 
 ## Estado de la base

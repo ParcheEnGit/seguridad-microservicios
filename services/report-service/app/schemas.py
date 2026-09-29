@@ -56,3 +56,23 @@ class AdminSummary(BaseModel):
     recent_alerts: list[RecentAlert]
     chart_24h: list[ChartPoint]
     generated_at: datetime
+
+
+class TelemetryDevice(BaseModel):
+    id: UUID
+    name: str
+    device_code: str
+
+
+class DeviceTelemetryPoint(BaseModel):
+    bucket: datetime
+    device_id: UUID
+    metric_code: str
+    value: float
+
+
+class DeviceTelemetrySeries(BaseModel):
+    devices: list[TelemetryDevice]
+    points: list[DeviceTelemetryPoint]
+    period: str
+    resolution: str
