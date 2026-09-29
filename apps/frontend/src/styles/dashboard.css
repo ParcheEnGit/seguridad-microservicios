@@ -1387,6 +1387,21 @@
   font-size: .78rem;
 }
 
+.device-telemetry-card__expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cfe0d7;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+  color: #0b5a3b;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .telemetry-controls {
   display: grid;
   gap: 9px;
@@ -1445,6 +1460,25 @@
 .telemetry-loading { vertical-align: -3px; animation: telemetry-spin 1s linear infinite; }
 
 @keyframes telemetry-spin { to { transform: rotate(360deg); } }
+
+.device-telemetry-card--expanded {
+  position: fixed;
+  z-index: 200;
+  inset: 22px;
+  overflow: auto;
+  margin: 0;
+  padding: 24px;
+  background: #fff;
+}
+
+.device-telemetry-card--expanded .device-telemetry-chart-wrap { min-height: calc(100vh - 250px); }
+.device-telemetry-card--expanded .device-telemetry-chart { height: min(62vh, 620px); }
+
+@media (max-width: 700px) {
+  .device-telemetry-card--expanded { inset: 8px; padding: 16px; }
+  .device-telemetry-card__expand { font-size: 0; padding: 8px; }
+  .device-telemetry-card__expand svg { margin: 0; }
+}
 
 .admin-empty {
   display: flex;
