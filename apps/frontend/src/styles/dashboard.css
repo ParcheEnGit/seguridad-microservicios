@@ -1441,6 +1441,7 @@
 .device-telemetry-chart-wrap { min-height: 275px; }
 .device-telemetry-chart { width: 100%; height: 270px; }
 .device-telemetry-chart__range { margin: 0; color: #6e8077; font-size: .75rem; }
+.telemetry-density-note { margin: 8px 0 0; color: #9a6511; font-size: .75rem; font-weight: 650; }
 .telemetry-loading { vertical-align: -3px; animation: telemetry-spin 1s linear infinite; }
 
 @keyframes telemetry-spin { to { transform: rotate(360deg); } }
