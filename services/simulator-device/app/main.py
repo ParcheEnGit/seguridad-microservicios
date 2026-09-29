@@ -3,7 +3,7 @@ import json
 import os
 import random
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -43,22 +43,29 @@ def send_cycle() -> int:
     sent = 0
     for target in targets:
         for metric in target["metrics"]:
-            try:
-                request_json(
-                    "/readings",
-                    method="POST",
-                    payload={
-                        "device_id": target["device_id"],
-                        "metric_code": metric["metric_code"],
-                        "unit": metric["unit"],
-                        "value": simulated_value(metric),
-                        "equipment_status": "operativo",
-                        "recorded_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
-                sent += 1
-            except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-                print(f"Reading skipped for {target['device_code']}: {exc}", flush=True)
+            timestamps = [datetime.now(timezone.utc)]
+            if target["needs_history"]:
+                # Una sola carga histórica ligera para que el gráfico de 24 h sea legible
+                # desde la primera demostración. El servicio ya no la solicitará después.
+                now = datetime.now(timezone.utc)
+                timestamps = [now - timedelta(hours=hour) for hour in range(24, 0, -1)] + [now]
+            for timestamp in timestamps:
+                try:
+                    request_json(
+                        "/readings",
+                        method="POST",
+                        payload={
+                            "device_id": target["device_id"],
+                            "metric_code": metric["metric_code"],
+                            "unit": metric["unit"],
+                            "value": simulated_value(metric),
+                            "equipment_status": "operativo",
+                            "recorded_at": timestamp.isoformat(),
+                        },
+                    )
+                    sent += 1
+                except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+                    print(f"Reading skipped for {target['device_code']}: {exc}", flush=True)
     return sent
 
 
