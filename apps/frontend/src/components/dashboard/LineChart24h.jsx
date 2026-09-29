@@ -37,8 +37,11 @@ export function LineChart24h({ points }) {
   const tooltipY = hovered ? Math.max(hovered.cy - 72, PAD.top) : 0;
   const selectNearest = (event, line) => {
     const bounds = event.currentTarget.ownerSVGElement.getBoundingClientRect();
-    const pointerX = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
-    const pointerY = ((event.clientY - bounds.top) / bounds.height) * HEIGHT;
+    const scale = Math.min(bounds.width / WIDTH, bounds.height / HEIGHT);
+    const offsetX = (bounds.width - WIDTH * scale) / 2;
+    const offsetY = (bounds.height - HEIGHT * scale) / 2;
+    const pointerX = (event.clientX - bounds.left - offsetX) / scale;
+    const pointerY = (event.clientY - bounds.top - offsetY) / scale;
     const value = line.values.reduce((nearest, current) => {
       const nearestDistance = (nearest.cx - pointerX) ** 2 + (nearest.cy - pointerY) ** 2;
       const currentDistance = (current.cx - pointerX) ** 2 + (current.cy - pointerY) ** 2;
@@ -47,7 +50,7 @@ export function LineChart24h({ points }) {
     setHovered({ ...value, key: line.key, label: line.label, unit: line.unit });
   };
 
-  return <div className="admin-chart-wrap"><svg className="admin-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Gráfico interactivo de temperatura y humedad de las últimas 24 horas" preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
+  return <div className="admin-chart-wrap"><svg className="admin-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Gráfico interactivo de temperatura y humedad de las últimas 24 horas" preserveAspectRatio="xMidYMid meet" onMouseLeave={() => setHovered(null)}>
     {Array.from({ length: GRID_LINES }, (_, index) => { const gy = PAD.top + (index * innerH) / (GRID_LINES - 1); return <line key={index} x1={PAD.left} x2={WIDTH - PAD.right} y1={gy} y2={gy} className="admin-chart__grid" />; })}
     {ticks.map((tick, index) => <text key={tick} x={x(tick)} y={HEIGHT - 12} className="admin-chart__label" textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{index === ticks.length - 1 ? "Ahora" : formatHour(new Date(tick))}</text>)}
     {hovered && <line x1={hovered.cx} x2={hovered.cx} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}
