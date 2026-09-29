@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas import AdminSummary
-from app.security import require_admin
+from app.security import get_current_claims, require_admin
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -57,7 +57,7 @@ RECENT_ALERTS_SQL = text("""
 """)
 
 CHART_24H_SQL = text("""
-    SELECT date_trunc('hour', recorded_at)                                    AS hour,
+    SELECT date_bin(INTERVAL '5 minutes', recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
            AVG(value) FILTER (WHERE metric_code = 'temperatura')::float       AS temperatura,
            AVG(value) FILTER (WHERE metric_code = 'humedad')::float           AS humedad
     FROM telemetry_service.readings
@@ -76,6 +76,19 @@ def admin_summary(db: Session = Depends(get_db), _: dict = Depends(require_admin
         tickets=dict(db.execute(TICKET_COUNTS_SQL).mappings().one()),
         readings=dict(db.execute(READING_STATS_SQL).mappings().one()),
         recent_alerts=[dict(row) for row in db.execute(RECENT_ALERTS_SQL, {"limit": RECENT_ALERTS_LIMIT}).mappings()],
+        chart_24h=[dict(row) for row in db.execute(CHART_24H_SQL).mappings()],
+        generated_at=datetime.now(timezone.utc),
+    )
+
+
+@router.get("/telemetry-summary", response_model=AdminSummary, summary="Resumen de telemetría para dashboards autorizados")
+def telemetry_summary(db: Session = Depends(get_db), _: dict = Depends(get_current_claims)) -> AdminSummary:
+    return AdminSummary(
+        devices=dict(db.execute(DEVICE_COUNTS_SQL).mappings().one()),
+        alerts=dict(db.execute(ALERT_COUNTS_SQL).mappings().one()),
+        tickets=dict(db.execute(TICKET_COUNTS_SQL).mappings().one()),
+        readings=dict(db.execute(READING_STATS_SQL).mappings().one()),
+        recent_alerts=[],
         chart_24h=[dict(row) for row in db.execute(CHART_24H_SQL).mappings()],
         generated_at=datetime.now(timezone.utc),
     )
