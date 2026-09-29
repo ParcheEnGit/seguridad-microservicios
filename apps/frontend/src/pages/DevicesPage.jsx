@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit3, Eye, ImagePlus, MoreVertical, Plus, Power, Router, Search, Server, SlidersHorizontal, Thermometer, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Edit3, Eye, ImagePlus, Maximize2, MoreVertical, Plus, Power, Router, Search, Server, SlidersHorizontal, Thermometer, X, ZoomIn, ZoomOut } from "lucide-react";
 import { canRegisterDevice } from "../constants/roles.js";
 import { createDevice, deactivateDevice, listDevices, replaceThresholds, updateDevice, uploadDevicePhoto } from "../services/deviceApi.js";
 import { fetchAlerts } from "../services/dashboardApi.js";
@@ -10,6 +10,16 @@ const EMPTY_THRESHOLD = { metric_code: "temperatura", unit: "°C", min_value: ""
 
 function Modal({ title, subtitle, children, onClose }) {
   return <div className="device-modal-backdrop" role="presentation"><section className="device-modal" role="dialog" aria-modal="true" aria-labelledby="device-dialog-title"><header className="device-modal__header"><div><h1 id="device-dialog-title">{title}</h1>{subtitle && <p>{subtitle}</p>}</div><button type="button" onClick={onClose} className="device-close" aria-label="Cerrar ventana"><X size={20} /></button></header>{children}</section></div>;
+}
+
+function PendingPhotoPreview({ photo, index, onRemove }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(photo);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [photo]);
+  return <figure><img src={url} alt={`Previsualización de ${photo.name}`} /><button type="button" aria-label={`Quitar ${photo.name}`} onClick={() => onRemove(index)}><X size={14} /></button><figcaption>{photo.name}</figcaption></figure>;
 }
 
 function DeviceFormModal({ device, onClose, onSaved }) {
@@ -27,8 +37,12 @@ function DeviceFormModal({ device, onClose, onSaved }) {
     const selectedPhotos = Array.from(event.target.files ?? []);
     const invalid = selectedPhotos.find((photo) => !["image/jpeg", "image/png", "image/webp"].includes(photo.type) || photo.size > 5 * 1024 * 1024);
     if (invalid) { setError("Cada fotografía debe ser JPEG, PNG o WebP y no superar 5 MB."); return; }
-    setError("");
-    setPhotos((current) => [...current, ...selectedPhotos].slice(0, 4));
+    setPhotos((current) => {
+      const nextPhotos = [...current, ...selectedPhotos];
+      if (nextPhotos.length > 3) setError("Cada dispositivo admite como máximo 3 fotografías.");
+      else setError("");
+      return nextPhotos.slice(0, 3);
+    });
     event.target.value = "";
   }
 
@@ -63,9 +77,9 @@ function DeviceFormModal({ device, onClose, onSaved }) {
         {editing && <label>Estado<select value={form.status} onChange={(event) => change("status", event.target.value)}><option value="activo">Activo</option><option value="mantenimiento">Mantenimiento</option><option value="inactivo">Inactivo</option></select></label>}
       </div>
       {!editing && <section className="device-photo-upload">
-        <div><strong>Fotografías del dispositivo</strong><small>Opcional. JPEG, PNG o WebP; máximo 5 MB por imagen.</small></div>
+        <div><strong>Fotografías del dispositivo</strong><small>Opcional. Máximo 3 imágenes; JPEG, PNG o WebP de hasta 5 MB. Se optimizan y guardan como WebP.</small></div>
         <label className="device-photo-upload__button"><ImagePlus size={17} /> Añadir fotografías<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addPhotos} /></label>
-        {photos.length > 0 && <div className="device-photo-preview">{photos.map((photo, index) => <figure key={`${photo.name}-${index}`}><img src={URL.createObjectURL(photo)} alt={`Previsualización de ${photo.name}`} /><button type="button" aria-label={`Quitar ${photo.name}`} onClick={() => setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index))}><X size={14} /></button><figcaption>{photo.name}</figcaption></figure>)}</div>}
+        {photos.length > 0 && <div className="device-photo-preview">{photos.map((photo, index) => <PendingPhotoPreview key={`${photo.name}-${index}`} photo={photo} index={index} onRemove={(photoIndex) => setPhotos((current) => current.filter((_, indexToCheck) => indexToCheck !== photoIndex))} />)}</div>}
       </section>}
       {!editing && <section className="device-initial-thresholds"><label className="device-initial-thresholds__toggle"><input type="checkbox" checked={includeThresholds} onChange={(event) => setIncludeThresholds(event.target.checked)} /><span><strong>Configurar umbrales ahora</strong><small>Opcional. Puedes definir los rangos de monitoreo antes de registrar el dispositivo.</small></span></label>{includeThresholds && <div className="device-threshold-grid">{thresholds.map((threshold, index) => <div className="device-threshold-card" key={`${threshold.metric_code}-${index}`}><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong>{thresholds.length > 1 && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button>}</div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => updateThreshold(index, "metric_code", event.target.value)} placeholder="temperatura" /></label><label>Unidad<input required value={threshold.unit} onChange={(event) => updateThreshold(index, "unit", event.target.value)} placeholder="°C" /></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => updateThreshold(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => updateThreshold(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>)}<button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, { ...EMPTY_THRESHOLD }])}><Plus size={16} /> Añadir otra métrica</button></div>}</section>}
       <div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : editing ? "Guardar cambios" : "Registrar dispositivo"}</button></div>
@@ -90,8 +104,23 @@ function ThresholdModal({ device, onClose, onSaved }) {
   return <Modal title={`Configurar umbrales — ${device.name}`} subtitle="Define los rangos permitidos para cada métrica del dispositivo." onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-threshold-grid">{thresholds.map((threshold, index) => <div className="device-threshold-card" key={threshold.id ?? `${threshold.metric_code}-${index}`}><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong><button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => updateThreshold(index, "metric_code", event.target.value)} placeholder="temperatura" /></label><label>Unidad<input required value={threshold.unit} onChange={(event) => updateThreshold(index, "unit", event.target.value)} placeholder="°C" /></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => updateThreshold(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => updateThreshold(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>)}</div><button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, { ...EMPTY_THRESHOLD }])}><Plus size={16} /> Añadir métrica</button><label className="device-notification-toggle"><span><strong>Notificar al superar umbral</strong><small>Se enviará una alerta cuando una lectura salga del rango.</small></span><input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} /></label><div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button></div></form></Modal>;
 }
 
+function DevicePhotoGallery({ photos, deviceName }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const activePhoto = photos[activeIndex];
+  const move = (direction) => setActiveIndex((current) => (current + direction + photos.length) % photos.length);
+  const closeViewer = () => { setViewerOpen(false); setZoom(1); };
+  if (!photos.length) return <section className="device-gallery device-gallery--empty"><ImagePlus size={22} /><span>Este dispositivo no tiene fotografías registradas.</span></section>;
+  return <section className="device-gallery" aria-label="Fotografías del dispositivo">
+    <div className="device-gallery__main"><img src={activePhoto.url} alt={`Fotografía ${activeIndex + 1} de ${deviceName}`} /><button type="button" className="device-gallery__expand" onClick={() => setViewerOpen(true)} aria-label="Ver fotografía a pantalla completa"><Maximize2 size={18} /></button>{photos.length > 1 && <><button type="button" className="device-gallery__arrow device-gallery__arrow--previous" onClick={() => move(-1)} aria-label="Fotografía anterior"><ChevronLeft size={20} /></button><button type="button" className="device-gallery__arrow device-gallery__arrow--next" onClick={() => move(1)} aria-label="Fotografía siguiente"><ChevronRight size={20} /></button></>}</div>
+    {photos.length > 1 && <div className="device-gallery__thumbnails">{photos.map((photo, index) => <button type="button" className={index === activeIndex ? "is-active" : ""} onClick={() => setActiveIndex(index)} key={photo.id} aria-label={`Ver fotografía ${index + 1}`}><img src={photo.url} alt="" /></button>)}</div>}
+    {viewerOpen && <div className="device-photo-viewer" role="dialog" aria-modal="true" aria-label={`Fotografía de ${deviceName}`} onClick={closeViewer}><div className="device-photo-viewer__toolbar" onClick={(event) => event.stopPropagation()}><span>{activeIndex + 1} de {photos.length}</span><button type="button" onClick={() => setZoom((current) => Math.max(1, current - .25))} disabled={zoom <= 1} aria-label="Alejar"><ZoomOut size={19} /></button><button type="button" onClick={() => setZoom((current) => Math.min(2.5, current + .25))} disabled={zoom >= 2.5} aria-label="Acercar"><ZoomIn size={19} /></button><button type="button" onClick={closeViewer} aria-label="Cerrar vista ampliada"><X size={21} /></button></div><div className="device-photo-viewer__canvas" onClick={(event) => event.stopPropagation()}>{photos.length > 1 && <button type="button" onClick={() => move(-1)} aria-label="Fotografía anterior"><ChevronLeft size={26} /></button>}<img src={activePhoto.url} alt={`Fotografía ${activeIndex + 1} de ${deviceName}`} style={{ transform: `scale(${zoom})` }} />{photos.length > 1 && <button type="button" onClick={() => move(1)} aria-label="Fotografía siguiente"><ChevronRight size={26} /></button>}</div></div>}
+  </section>;
+}
+
 function DetailModal({ device, admin, onClose, onConfigure }) {
-  return <Modal title={device.name} subtitle={`${device.device_code} · ${device.device_type} · ${device.location}`} onClose={onClose}><div className="device-detail-modal"><div className="device-detail-summary"><span className={`device-status device-status--${device.status}`}>{device.status}</span><span>{device.thresholds.length} umbral(es) configurado(s)</span></div><h2>Umbrales configurados</h2>{device.thresholds.length ? device.thresholds.map((threshold) => <div className="device-threshold-item" key={threshold.id}><strong>{threshold.metric_code}</strong><span>{threshold.min_value} a {threshold.max_value} {threshold.unit}</span></div>) : <p className="device-muted">Este dispositivo aún no tiene umbrales configurados.</p>}<p className="device-muted">Notificaciones: {device.metadata?.notify_on_threshold_breach === false ? "desactivadas" : "activadas"}.</p>{admin && <div className="device-form-actions"><button className="device-primary-btn" onClick={onConfigure}><SlidersHorizontal size={16} /> Configurar umbrales</button></div>}</div></Modal>;
+  return <Modal title={device.name} subtitle={`${device.device_code} · ${device.device_type} · ${device.location}`} onClose={onClose}><div className="device-detail-modal"><div className="device-detail-summary"><span className={`device-status device-status--${device.status}`}>{device.status}</span><span>{device.thresholds.length} umbral(es) configurado(s)</span></div><h2>Fotografías</h2><DevicePhotoGallery photos={device.photos ?? []} deviceName={device.name} /><h2>Umbrales configurados</h2>{device.thresholds.length ? device.thresholds.map((threshold) => <div className="device-threshold-item" key={threshold.id}><strong>{threshold.metric_code}</strong><span>{threshold.min_value} a {threshold.max_value} {threshold.unit}</span></div>) : <p className="device-muted">Este dispositivo aún no tiene umbrales configurados.</p>}<p className="device-muted">Notificaciones: {device.metadata?.notify_on_threshold_breach === false ? "desactivadas" : "activadas"}.</p>{admin && <div className="device-form-actions"><button className="device-primary-btn" onClick={onConfigure}><SlidersHorizontal size={16} /> Configurar umbrales</button></div>}</div></Modal>;
 }
 
 function DeviceActions({ device, admin, onDetail, onEdit, onThresholds, onDeactivate }) {
