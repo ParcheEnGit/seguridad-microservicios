@@ -1376,6 +1376,75 @@
 .admin-chart__tooltip-title { fill: #fff; font-size: 12px; font-weight: 700; }
 .admin-chart__tooltip-time { fill: #c8d9d0; font-size: 10px; }
 
+.device-telemetry-card {
+  margin-top: 22px;
+  min-height: 390px;
+}
+
+.device-telemetry-card__subtitle {
+  margin: 4px 0 0;
+  color: #718079;
+  font-size: .78rem;
+}
+
+.telemetry-controls {
+  display: grid;
+  gap: 9px;
+  margin: 15px 0 12px;
+}
+
+.telemetry-controls > div,
+.telemetry-devices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.telemetry-controls span {
+  min-width: 74px;
+  color: #64766c;
+  font-size: .73rem;
+  font-weight: 750;
+}
+
+.telemetry-controls button,
+.telemetry-devices button {
+  border: 1px solid #dce7e1;
+  border-radius: 7px;
+  padding: 5px 9px;
+  background: #fff;
+  color: #587067;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.telemetry-controls button.is-active {
+  border-color: #0b5a3b;
+  background: #0b5a3b;
+  color: #fff;
+}
+
+.telemetry-devices {
+  padding: 10px 0;
+  border-top: 1px solid #edf2ef;
+}
+
+.telemetry-devices > span { display: inline-flex; gap: 3px; }
+.telemetry-devices button { display: inline-flex; align-items: center; gap: 5px; }
+.telemetry-devices button.is-visible { border-color: #9ccbb5; color: #174f38; background: #f2faf6; }
+.telemetry-devices i { width: 8px; height: 8px; border-radius: 50%; }
+.telemetry-devices .telemetry-devices__only { padding-inline: 6px; color: #0b5a3b; }
+
+.device-telemetry-chart-wrap { min-height: 275px; }
+.device-telemetry-chart { width: 100%; height: 270px; }
+.device-telemetry-chart__range { margin: 0; color: #6e8077; font-size: .75rem; }
+.telemetry-loading { vertical-align: -3px; animation: telemetry-spin 1s linear infinite; }
+
+@keyframes telemetry-spin { to { transform: rotate(360deg); } }
+
 .admin-empty {
   display: flex;
   flex: 1;

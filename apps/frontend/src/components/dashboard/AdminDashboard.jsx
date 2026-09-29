@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { BarChart3, Bell, ChevronRight, Plus, RefreshCw, ShieldAlert } from "lucide-react";
 import { getAdminSummary } from "../../services/reportApi.js";
 import { LineChart24h, SERIES } from "./LineChart24h.jsx";
+import { DeviceTelemetryChart } from "./DeviceTelemetryChart.jsx";
 
 const REFRESH_MS = 15 * 1000;
 
@@ -111,7 +112,7 @@ export function AdminDashboard({ onNavigate }) {
       <section className="dashboard-grid dashboard-grid--main">
         <article className="dashboard-card admin-chart-card">
           <header className="admin-card-header">
-            <h2 className="dashboard-card__title">Temperatura y Humedad — Últimas 24h</h2>
+            <h2 className="dashboard-card__title">Promedio global de temperatura y humedad — Últimas 24 h</h2>
             <ul className="admin-legend">
               {SERIES.map((serie) => (
                 <li key={serie.key}><span style={{ background: serie.color }} aria-hidden="true" />{serie.label}</li>
@@ -161,6 +162,8 @@ export function AdminDashboard({ onNavigate }) {
           </button>
         </div>
       </section>
+
+      <DeviceTelemetryChart />
     </section>
   );
 }
