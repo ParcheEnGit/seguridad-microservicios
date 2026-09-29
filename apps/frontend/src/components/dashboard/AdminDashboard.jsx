@@ -3,7 +3,7 @@ import { BarChart3, Bell, ChevronRight, Plus, RefreshCw, ShieldAlert } from "luc
 import { getAdminSummary } from "../../services/reportApi.js";
 import { LineChart24h, SERIES } from "./LineChart24h.jsx";
 
-const REFRESH_MS = 60 * 1000;
+const REFRESH_MS = 15 * 1000;
 
 const METRIC_NAMES = { temperatura: "Temperatura", humedad: "Humedad" };
 
