@@ -1,9 +1,22 @@
 import React from "react";
-import { Bell, Search } from "lucide-react";
+import { Bell, Menu, Search, Shield, X } from "lucide-react";
 
-export function Topbar() {
+export function Topbar({ isMobileMenuOpen, onToggleMobileMenu }) {
   return (
     <header className="dashboard-topbar">
+      <button
+        type="button"
+        className="dashboard-menu-btn"
+        onClick={onToggleMobileMenu}
+        aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+        aria-expanded={isMobileMenuOpen}
+      >
+        {isMobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
+      </button>
+      <div className="dashboard-mobile-brand" aria-hidden="true">
+        <Shield size={17} />
+        <strong>LabSentinel</strong>
+      </div>
       <label className="dashboard-search" htmlFor="dashboard-search-input">
         <Search size={18} aria-hidden="true" />
         <input
