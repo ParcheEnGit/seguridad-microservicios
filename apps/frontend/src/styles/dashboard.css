@@ -7,6 +7,12 @@
 }
 
 .dashboard-sidebar {
+  /* Fijo a la altura de la ventana: el usuario y "Cerrar sesión" quedan siempre visibles. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
