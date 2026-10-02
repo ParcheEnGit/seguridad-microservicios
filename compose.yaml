@@ -183,6 +183,9 @@ services:
       SERVICE_NAME: alert-ticket-service
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
+      TICKET_ATTACHMENTS_PATH: /data/ticket-attachments
+    volumes:
+      - ticket_attachments:/data/ticket-attachments
     depends_on:
       database-migrations:
         condition: service_completed_successfully
@@ -224,3 +227,4 @@ volumes:
   postgres_data:
   frontend_node_modules:
   device_images:
+  ticket_attachments:

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   BarChart3,
   Database,
@@ -18,6 +19,7 @@ import { fetchAlerts } from "../services/dashboardApi.js";
 import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
+import { TicketsPage } from "./TicketsPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -26,6 +28,17 @@ export function DashboardPage({ user, onLogout }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
+  const [ticketsEntry, setTicketsEntry] = useState({ view: "list", key: 0 });
+
+  function navigate(item) {
+    if (item === "tickets") setTicketsEntry((current) => ({ view: "list", key: current.key + 1 }));
+    setActiveItem(item);
+  }
+
+  function openTicketForm() {
+    setTicketsEntry((current) => ({ view: "create", key: current.key + 1 }));
+    setActiveItem("tickets");
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -103,11 +116,13 @@ export function DashboardPage({ user, onLogout }) {
     <DashboardLayout
       user={user}
       activeItem={activeItem}
-      onNavigate={setActiveItem}
+      onNavigate={navigate}
       onLogout={onLogout}
     >
       {activeItem === "dispositivos" ? (
         <DevicesPage user={user} />
+      ) : activeItem === "tickets" ? (
+        <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (
@@ -212,6 +227,15 @@ export function DashboardPage({ user, onLogout }) {
                 </div>
 
                 <RecentAlerts alerts={alerts} />
+
+                <button
+                  type="button"
+                  className="ticket-outline-btn reader-report-btn"
+                  onClick={openTicketForm}
+                >
+                  <AlertTriangle size={17} aria-hidden="true" />
+                  Reportar condición
+                </button>
               </div>
             </section>
 

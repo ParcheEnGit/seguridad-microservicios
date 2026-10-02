@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import router as alert_router
+from app.tickets import router as ticket_router
 
 
 SERVICE_NAME = os.getenv("SERVICE_NAME", "alert-ticket-service")
@@ -17,11 +18,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8080", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(alert_router)
+app.include_router(ticket_router)
 
 
 @app.get("/health", tags=["system"])
