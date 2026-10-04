@@ -20,6 +20,7 @@ import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
 import { TicketsPage } from "./TicketsPage.jsx";
+import { TelemetryPage } from "./TelemetryPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -123,6 +124,8 @@ export function DashboardPage({ user, onLogout }) {
         <DevicesPage user={user} />
       ) : activeItem === "tickets" ? (
         <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} />
+      ) : activeItem === "telemetria" ? (
+        <TelemetryPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (

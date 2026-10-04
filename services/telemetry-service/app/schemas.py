@@ -40,6 +40,11 @@ class SimulationMetric(BaseModel):
     min_value: float | None = None
     max_value: float | None = None
 
+class TelemetryHistoryResponse(BaseModel):
+    items: list[TelemetryReadingResponse]
+    total: int
+    limit: int
+    offset: int
 
 class SimulationTarget(BaseModel):
     device_id: UUID

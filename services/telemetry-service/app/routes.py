@@ -1,12 +1,18 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas import SimulationMetric, SimulationTarget, TelemetryReadingCreate, TelemetryReadingResponse
-from app.security import require_simulator_key
+from app.schemas import (
+    SimulationMetric,
+    SimulationTarget,
+    TelemetryHistoryResponse,
+    TelemetryReadingCreate,
+    TelemetryReadingResponse,
+)
+from app.security import get_current_claims, require_simulator_key
 
 router = APIRouter(tags=["telemetría"])
 
@@ -48,6 +54,26 @@ TARGETS_SQL = text("""
     LEFT JOIN device_service.thresholds t ON t.device_id = d.id
     WHERE d.status = 'activo'
     ORDER BY d.device_code, t.metric_code
+""")
+HISTORY_SQL = text("""
+    SELECT id, device_id, metric_code, value, unit,
+           equipment_status, source, recorded_at, received_at
+    FROM telemetry_service.readings
+    WHERE device_id = :device_id
+      AND (:metric_code IS NULL OR metric_code = :metric_code)
+      AND recorded_at >= :start_at
+      AND recorded_at <= :end_at
+    ORDER BY recorded_at DESC
+    LIMIT :limit OFFSET :offset
+""")
+
+HISTORY_COUNT_SQL = text("""
+    SELECT COUNT(*)
+    FROM telemetry_service.readings
+    WHERE device_id = :device_id
+      AND (:metric_code IS NULL OR metric_code = :metric_code)
+      AND recorded_at >= :start_at
+      AND recorded_at <= :end_at
 """)
 
 
@@ -93,7 +119,6 @@ def create_reading(
     db.commit()
     return dict(row)
 
-
 @router.get(
     "/simulation-targets",
     response_model=list[SimulationTarget],
@@ -127,3 +152,52 @@ def simulation_targets(
         existing = {metric.metric_code for metric in target.metrics}
         target.metrics.extend(metric for metric in DEFAULT_METRICS if metric.metric_code not in existing)
     return list(targets.values())
+
+@router.get(
+    "/readings/history",
+    response_model=TelemetryHistoryResponse,
+    summary="Consultar historial de lecturas",
+)
+def reading_history(
+    device_id: str = Query(..., min_length=1),
+    start_at: datetime = Query(...),
+    end_at: datetime = Query(...),
+    metric_code: str | None = Query(default=None, min_length=1, max_length=50),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: dict = Depends(get_current_claims),
+) -> TelemetryHistoryResponse:
+    if start_at > end_at:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
+    history_params = {
+        "device_id": device_id,
+        "metric_code": metric_code.strip().lower() if metric_code else None,
+        "start_at": start_at,
+        "end_at": end_at,
+    }
+
+    total = db.execute(
+        HISTORY_COUNT_SQL,
+        history_params,
+    ).scalar_one()
+
+    rows = db.execute(
+        HISTORY_SQL,
+        {
+            **history_params,
+            "limit": limit,
+            "offset": offset,
+        },
+    ).mappings().all()
+
+    return TelemetryHistoryResponse(
+        items=[TelemetryReadingResponse(**row) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
