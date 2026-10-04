@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
     simulator_api_key: str
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+    cookie_name: str = "labsentinel_session"
 
 
 @lru_cache
