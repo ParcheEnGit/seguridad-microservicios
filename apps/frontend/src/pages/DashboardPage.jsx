@@ -244,7 +244,7 @@ export function DashboardPage({ user, onLogout }) {
 
             <section className="reader-panel reader-telemetry-panel" aria-label="Telemetría en tiempo real">
               <div className="reader-panel__header">
-                <div><h2>Telemetría reciente</h2><p>Lecturas simuladas actualizadas cada 15 segundos.</p></div>
+                <div><h2>Telemetría ambiental reciente</h2><p>Lecturas simuladas del ambiente actualizadas cada 15 segundos.</p></div>
                 <span className="reader-telemetry-panel__count">{telemetry ? `${telemetry.readings.today} hoy` : "Cargando..."}</span>
               </div>
               {telemetry?.chart_24h?.length ? <LineChart24h points={telemetry.chart_24h} /> : <div className="reader-empty-state"><BarChart3 className="reader-empty-state__icon" size={30} /><p>Aún no hay lecturas disponibles.</p><span>Las lecturas aparecerán cuando el simulador esté habilitado.</span></div>}
