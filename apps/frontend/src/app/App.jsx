@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { DashboardPage } from "../pages/DashboardPage.jsx";
 import { LoginPage } from "../pages/LoginPage.jsx";
+import { PeakControlPage } from "../pages/PeakControlPage.jsx";
 import { fetchCurrentUser, logout } from "../services/authApi.js";
+import { isAdmin } from "../constants/roles.js";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -52,6 +54,9 @@ function AppContent() {
   }
 
   if (user) {
+    if (window.location.pathname === "/peak") {
+      return isAdmin(user.role) ? <PeakControlPage /> : <main className="auth-page"><section className="auth-card"><h1 className="auth-title">Acceso denegado</h1><p className="auth-subtitle">Esta consola es exclusiva para administradores.</p></section></main>;
+    }
     return <DashboardPage user={user} onLogout={handleLogout} />;
   }
 
