@@ -45,10 +45,10 @@ def send_cycle() -> int:
         for metric in target["metrics"]:
             timestamps = [datetime.now(timezone.utc)]
             if target["needs_history"]:
-                # Una sola carga histórica ligera para que el gráfico de 24 h sea legible
-                # desde la primera demostración. El servicio ya no la solicitará después.
+                # Una carga histórica ligera, distribuida durante siete días, mantiene
+                # legibles los gráficos de 24 h y de periodos más largos desde la demo.
                 now = datetime.now(timezone.utc)
-                timestamps = [now - timedelta(hours=hour) for hour in range(24, 0, -1)] + [now]
+                timestamps = [now - timedelta(hours=hour) for hour in range(7 * 24, 0, -6)] + [now]
             for timestamp in timestamps:
                 try:
                     request_json(
