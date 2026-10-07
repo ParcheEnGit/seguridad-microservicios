@@ -57,12 +57,14 @@ RECENT_ALERTS_SQL = text("""
 """)
 
 CHART_24H_SQL = text("""
-    SELECT date_bin(INTERVAL '5 minutes', recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
-           AVG(value) FILTER (WHERE metric_code = 'temperatura')::float       AS temperatura,
-           AVG(value) FILTER (WHERE metric_code = 'humedad')::float           AS humedad
-    FROM telemetry_service.readings
-    WHERE recorded_at >= NOW() - INTERVAL '24 hours'
-      AND metric_code IN ('temperatura', 'humedad')
+    SELECT date_bin(INTERVAL '5 minutes', r.recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
+           AVG(r.value) FILTER (WHERE r.metric_code = 'temperatura')::float       AS temperatura,
+           AVG(r.value) FILTER (WHERE r.metric_code = 'humedad')::float           AS humedad
+    FROM telemetry_service.readings r
+    JOIN device_service.devices d ON d.id = r.device_id
+    WHERE r.recorded_at >= NOW() - INTERVAL '24 hours'
+      AND r.metric_code IN ('temperatura', 'humedad')
+      AND concat_ws(' ', d.name, d.device_code, d.device_type) ILIKE '%ambient%'
     GROUP BY 1
     ORDER BY 1
 """)

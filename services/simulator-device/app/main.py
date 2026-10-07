@@ -40,16 +40,23 @@ def simulated_value(metric: dict) -> float:
 
 def send_cycle() -> int:
     targets = request_json("/simulation-targets")
+    pending_peaks = request_json("/simulation/peaks")
+    peaks_by_metric = {
+        (str(peak["device_id"]), peak["metric_code"]): peak
+        for peak in pending_peaks
+    }
     sent = 0
     for target in targets:
         for metric in target["metrics"]:
+            peak = peaks_by_metric.get((str(target["device_id"]), metric["metric_code"]))
             timestamps = [datetime.now(timezone.utc)]
             if target["needs_history"]:
-                # Una sola carga histórica ligera para que el gráfico de 24 h sea legible
-                # desde la primera demostración. El servicio ya no la solicitará después.
+                # Una carga histórica ligera, distribuida durante siete días, mantiene
+                # legibles los gráficos de 24 h y de periodos más largos desde la demo.
                 now = datetime.now(timezone.utc)
-                timestamps = [now - timedelta(hours=hour) for hour in range(24, 0, -1)] + [now]
+                timestamps = [now - timedelta(hours=hour) for hour in range(7 * 24, 0, -6)] + [now]
             for timestamp in timestamps:
+                is_peak_reading = peak is not None and timestamp == timestamps[-1]
                 try:
                     request_json(
                         "/readings",
@@ -58,12 +65,18 @@ def send_cycle() -> int:
                             "device_id": target["device_id"],
                             "metric_code": metric["metric_code"],
                             "unit": metric["unit"],
-                            "value": simulated_value(metric),
+                            "value": peak["value"] if is_peak_reading else simulated_value(metric),
                             "equipment_status": "operativo",
                             "recorded_at": timestamp.isoformat(),
                         },
                     )
                     sent += 1
+                    if is_peak_reading:
+                        request_json(f"/simulation/peaks/{peak['id']}/consume", method="POST", payload={})
+                        print(
+                            f"[PEAK] {target['device_code']} {metric['metric_code']}={peak['value']}{metric['unit']}",
+                            flush=True,
+                        )
                 except (HTTPError, URLError, TimeoutError, ValueError) as exc:
                     print(f"Reading skipped for {target['device_code']}: {exc}", flush=True)
     return sent

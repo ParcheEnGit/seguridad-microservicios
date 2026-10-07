@@ -1,6 +1,6 @@
 # HU6: Simulación de telemetría
 
-El `simulator-device` genera lecturas para todos los dispositivos con estado `activo`, incluidos los registrados antes de esta implementación y los que se agreguen posteriormente. Consulta los objetivos en cada ciclo, por lo que no necesita reiniciarse al crear un dispositivo.
+El `simulator-device` genera lecturas para todos los dispositivos con estado `activo`, incluidos los registrados antes de esta implementación y los que se agreguen posteriormente. Consulta los objetivos en cada ciclo, por lo que no necesita reiniciarse al crear un dispositivo. Si aún no existe historial reciente, crea una muestra distribuida de siete días para que los gráficos no inicien vacíos.
 
 ## Configuración local
 

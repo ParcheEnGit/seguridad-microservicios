@@ -37,3 +37,12 @@ def get_current_claims(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesión inválida o expirada",
         ) from exc
+
+
+def require_admin(claims: dict = Depends(get_current_claims)) -> dict:
+    if claims.get("role") != 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta operación es exclusiva para administradores",
+        )
+    return claims

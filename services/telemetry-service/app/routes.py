@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from threading import Lock
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
@@ -7,12 +9,14 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
     SimulationMetric,
+    SimulationPeak,
+    SimulationPeakCreate,
     SimulationTarget,
     TelemetryHistoryResponse,
     TelemetryReadingCreate,
     TelemetryReadingResponse,
 )
-from app.security import get_current_claims, require_simulator_key
+from app.security import get_current_claims, require_admin, require_simulator_key
 
 router = APIRouter(tags=["telemetría"])
 
@@ -20,6 +24,8 @@ DEFAULT_METRICS = (
     SimulationMetric(metric_code="temperatura", unit="°c", min_value=18, max_value=28),
     SimulationMetric(metric_code="humedad", unit="%", min_value=40, max_value=70),
 )
+SIMULATION_PEAKS: dict[UUID, dict] = {}
+SIMULATION_PEAKS_LOCK = Lock()
 
 DEVICE_SQL = text("""
     SELECT id, status
@@ -31,6 +37,14 @@ THRESHOLD_SQL = text("""
     SELECT unit
     FROM device_service.thresholds
     WHERE device_id = :device_id AND metric_code = :metric_code
+""")
+
+PEAK_TARGET_SQL = text("""
+    SELECT d.id, d.device_code, d.status, t.metric_code, t.unit,
+           t.min_value::float AS min_value, t.max_value::float AS max_value
+    FROM device_service.devices d
+    JOIN device_service.thresholds t ON t.device_id = d.id
+    WHERE d.id = :device_id AND t.metric_code = :metric_code
 """)
 
 INSERT_READING_SQL = text("""
@@ -46,7 +60,7 @@ TARGETS_SQL = text("""
            NOT EXISTS (
                SELECT 1 FROM telemetry_service.readings r
                WHERE r.device_id = d.id
-                 AND r.recorded_at < NOW() - INTERVAL '6 hours'
+                 AND r.recorded_at BETWEEN NOW() - INTERVAL '7 days' AND NOW() - INTERVAL '6 hours'
            ) AS needs_history,
            t.metric_code, t.unit,
            t.min_value::float, t.max_value::float
@@ -152,6 +166,70 @@ def simulation_targets(
         existing = {metric.metric_code for metric in target.metrics}
         target.metrics.extend(metric for metric in DEFAULT_METRICS if metric.metric_code not in existing)
     return list(targets.values())
+
+
+@router.post(
+    "/simulation/peaks",
+    response_model=SimulationPeak,
+    status_code=status.HTTP_201_CREATED,
+    summary="Programar un pico demostrativo para el simulador",
+)
+def create_simulation_peak(
+    payload: SimulationPeakCreate,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> dict:
+    target = db.execute(
+        PEAK_TARGET_SQL,
+        {"device_id": payload.device_id, "metric_code": payload.metric_code},
+    ).mappings().one_or_none()
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El dispositivo no tiene un umbral para esa métrica")
+    if target["status"] != "activo":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El dispositivo debe estar activo para simular un pico")
+
+    range_size = target["max_value"] - target["min_value"]
+    margin = max(range_size * 0.25, 0.5)
+    value = target["max_value"] + margin if payload.direction == "alto" else target["min_value"] - margin
+    peak = {
+        "id": uuid4(),
+        "device_id": target["id"],
+        "device_code": target["device_code"],
+        "metric_code": target["metric_code"],
+        "unit": target["unit"].strip().lower(),
+        "value": round(value, 2),
+        "cycles_remaining": payload.cycles,
+        "created_at": datetime.now(timezone.utc),
+    }
+    with SIMULATION_PEAKS_LOCK:
+        SIMULATION_PEAKS[peak["id"]] = peak
+    return peak
+
+
+@router.get(
+    "/simulation/peaks",
+    response_model=list[SimulationPeak],
+    summary="Obtener picos demostrativos pendientes",
+)
+def list_simulation_peaks(_: None = Depends(require_simulator_key)) -> list[dict]:
+    with SIMULATION_PEAKS_LOCK:
+        return list(SIMULATION_PEAKS.values())
+
+
+@router.post(
+    "/simulation/peaks/{peak_id}/consume",
+    summary="Consumir un ciclo de un pico demostrativo",
+)
+def consume_simulation_peak(peak_id: UUID, _: None = Depends(require_simulator_key)) -> dict:
+    with SIMULATION_PEAKS_LOCK:
+        peak = SIMULATION_PEAKS.get(peak_id)
+        if peak is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El pico ya no está disponible")
+        peak["cycles_remaining"] -= 1
+        remaining = peak["cycles_remaining"]
+        if remaining <= 0:
+            del SIMULATION_PEAKS[peak_id]
+    return {"consumed": True, "cycles_remaining": max(remaining, 0)}
 
 @router.get(
     "/readings/history",
