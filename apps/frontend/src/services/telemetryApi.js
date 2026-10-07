@@ -1,8 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
-async function request(path) {
+async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}/telemetry${path}`, {
     credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
+    ...options,
   });
 
   const data = await response.json().catch(() => ({}));
@@ -37,4 +39,11 @@ export function getTelemetryHistory({
   }
 
   return request(`/readings/history?${params.toString()}`);
+}
+
+export function createSimulationPeak(payload) {
+  return request("/simulation/peaks", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
