@@ -46,7 +46,7 @@ TARGETS_SQL = text("""
            NOT EXISTS (
                SELECT 1 FROM telemetry_service.readings r
                WHERE r.device_id = d.id
-                 AND r.recorded_at < NOW() - INTERVAL '6 hours'
+                 AND r.recorded_at BETWEEN NOW() - INTERVAL '7 days' AND NOW() - INTERVAL '6 hours'
            ) AS needs_history,
            t.metric_code, t.unit,
            t.min_value::float, t.max_value::float
