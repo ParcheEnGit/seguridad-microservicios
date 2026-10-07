@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -51,3 +52,21 @@ class SimulationTarget(BaseModel):
     device_code: str
     needs_history: bool = False
     metrics: list[SimulationMetric]
+
+
+class SimulationPeakCreate(BaseModel):
+    device_id: UUID
+    metric_code: Literal["temperatura", "humedad"]
+    direction: Literal["alto", "bajo"] = "alto"
+    cycles: int = Field(default=3, ge=1, le=20)
+
+
+class SimulationPeak(BaseModel):
+    id: UUID
+    device_id: UUID
+    device_code: str
+    metric_code: str
+    unit: str
+    value: float
+    cycles_remaining: int
+    created_at: datetime
