@@ -29,11 +29,13 @@ class FakeResult:
 
 
 class FakeDatabase:
-    def __init__(self):
+    def __init__(self, status="abierta"):
         self.alert_id = uuid.uuid4()
         self.reading_id = uuid.uuid4()
-        self.status = "abierta"
+        self.status = status
         self.committed = False
+        self.update_sql = None
+        now = datetime.now(timezone.utc)
         self.alert = {
             "id": self.alert_id,
             "device_id": uuid.uuid4(),
@@ -47,12 +49,12 @@ class FakeDatabase:
             "threshold_max": Decimal("28"),
             "condition": "above_max",
             "severity": "critica",
-            "status": "abierta",
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
+            "status": status,
+            "created_at": now,
+            "updated_at": now,
             "type": "temperatura",
             "deviceName": "Sensor norte",
-            "date": datetime.now(timezone.utc),
+            "date": now,
         }
 
     def execute(self, statement, params=None):
@@ -60,6 +62,7 @@ class FakeDatabase:
         if "SELECT status" in sql:
             return FakeResult({"status": self.status})
         if "UPDATE alert_ticket_service.alerts" in sql:
+            self.update_sql = sql
             self.status = params["status"]
             self.alert["status"] = self.status
             return FakeResult()
@@ -135,4 +138,62 @@ def test_lector_no_puede_cambiar_estado_de_alerta():
     )
 
     assert response.status_code == 403
+    assert not database.committed
+
+
+def test_admin_puede_cerrar_alerta_revisada_y_conserva_quien_reviso():
+    client, database = setup_client(role=0, db=FakeDatabase(status="revisada"))
+    response = client.patch(
+        f"/alerts/{database.alert_id}/status",
+        json={"status": "cerrada"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cerrada"
+    assert "resolved_by_user_id" in database.update_sql
+    assert "reviewed_by_user_id" not in database.update_sql
+
+
+def test_alerta_cerrada_no_puede_reabrirse():
+    client, database = setup_client(role=0, db=FakeDatabase(status="cerrada"))
+    response = client.patch(
+        f"/alerts/{database.alert_id}/status",
+        json={"status": "abierta"},
+    )
+
+    assert response.status_code == 409
+    assert not database.committed
+
+
+def test_alerta_abierta_no_puede_cerrarse_sin_revision():
+    client, database = setup_client(role=0)
+    response = client.patch(
+        f"/alerts/{database.alert_id}/status",
+        json={"status": "cerrada"},
+    )
+
+    assert response.status_code == 409
+    assert not database.committed
+
+
+def test_alerta_revisada_no_puede_volver_a_abierta():
+    client, database = setup_client(role=0, db=FakeDatabase(status="revisada"))
+    response = client.patch(
+        f"/alerts/{database.alert_id}/status",
+        json={"status": "abierta"},
+    )
+
+    assert response.status_code == 409
+    assert not database.committed
+
+
+def test_sin_sesion_no_puede_cambiar_estado():
+    database = FakeDatabase()
+    app.dependency_overrides[get_db] = lambda: database
+    response = TestClient(app).patch(
+        f"/alerts/{database.alert_id}/status",
+        json={"status": "revisada"},
+    )
+
+    assert response.status_code == 401
     assert not database.committed
