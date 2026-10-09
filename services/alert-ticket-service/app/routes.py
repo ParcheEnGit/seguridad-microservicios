@@ -39,6 +39,30 @@ ALERT_FIELDS_SQL = """
     LEFT JOIN device_service.devices d ON d.id = a.device_id
 """
 
+NEXT_ALERT_STATUS = {
+    "abierta": "revisada",
+    "revisada": "cerrada",
+}
+
+STATUS_UPDATE_SQL = {
+    "revisada": """
+        UPDATE alert_ticket_service.alerts
+        SET status = :status,
+            reviewed_by_user_id = :user_id,
+            reviewed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = :alert_id
+    """,
+    "cerrada": """
+        UPDATE alert_ticket_service.alerts
+        SET status = :status,
+            resolved_by_user_id = :user_id,
+            resolved_at = NOW(),
+            updated_at = NOW()
+        WHERE id = :alert_id
+    """,
+}
+
 
 @router.get(
     "/alerts",
@@ -153,24 +177,21 @@ def update_alert_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Alerta no encontrada",
         )
-    if alert["status"] == "cerrada" and payload.status != "cerrada":
+    current_status = alert["status"]
+    if current_status == "cerrada" and payload.status != "cerrada":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Una alerta cerrada no puede volver a abrirse",
         )
+    if current_status != payload.status and NEXT_ALERT_STATUS.get(current_status) != payload.status:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No se puede pasar una alerta de '{current_status}' a '{payload.status}'",
+        )
 
-    if alert["status"] != payload.status:
+    if current_status != payload.status:
         db.execute(
-            text("""
-                UPDATE alert_ticket_service.alerts
-                SET status = :status,
-                    reviewed_by_user_id = CASE WHEN :status = 'revisada' THEN :user_id ELSE NULL END,
-                    reviewed_at = CASE WHEN :status = 'revisada' THEN NOW() ELSE NULL END,
-                    resolved_by_user_id = CASE WHEN :status = 'cerrada' THEN :user_id ELSE NULL END,
-                    resolved_at = CASE WHEN :status = 'cerrada' THEN NOW() ELSE NULL END,
-                    updated_at = NOW()
-                WHERE id = :alert_id
-            """),
+            text(STATUS_UPDATE_SQL[payload.status]),
             {
                 "alert_id": alert_id,
                 "status": payload.status,

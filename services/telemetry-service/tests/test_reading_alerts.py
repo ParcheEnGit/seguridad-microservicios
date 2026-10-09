@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-os.environ.setdefault("DATABASE_URL", "sqlite://")
+os.environ.setdefault("DATABASE_URL", "postgresql+psycopg2://test:test@localhost:5432/test")
 os.environ.setdefault("JWT_SECRET", "test-secret-min-32-characters-long")
 os.environ.setdefault("SIMULATOR_API_KEY", "test-simulator-key")
 
@@ -12,7 +12,14 @@ from fastapi.testclient import TestClient
 
 from app.db import get_db
 from app.main import app
+from app.routes import classify_threshold_breach
 from app.security import require_simulator_key
+
+THRESHOLD = {
+    "unit": "°c",
+    "min_value": Decimal("18"),
+    "max_value": Decimal("28"),
+}
 
 
 class FakeResult:
@@ -68,6 +75,8 @@ class FakeDatabase:
             return FakeResult(self.alert_insert)
         if "SELECT id, severity" in sql:
             return FakeResult(self.existing_alert)
+        if "UPDATE alert_ticket_service.alerts" in sql:
+            return FakeResult()
         raise AssertionError(f"SQL inesperado: {sql}")
 
     def commit(self):
@@ -152,3 +161,72 @@ def test_alerta_activa_existente_no_se_duplica(client):
     assert response.json()["alert_id"] == str(existing_id)
     assert response.json()["alert_created"] is False
     assert db.committed
+
+
+def test_lectura_critica_repetida_escala_alerta_existente(client):
+    existing_id = uuid.uuid4()
+    db = FakeDatabase(
+        threshold=THRESHOLD,
+        existing_alert={"id": existing_id, "severity": "advertencia"},
+    )
+
+    response = post_reading(client, db, value="30")
+
+    assert response.status_code == 201
+    assert response.json()["severity"] == "critica"
+    assert response.json()["alert_created"] is False
+    assert any("SET severity = 'critica'" in sql for sql in db.statements)
+
+
+def test_lectura_advertencia_repetida_no_cambia_alerta_critica(client):
+    db = FakeDatabase(
+        threshold=THRESHOLD,
+        existing_alert={"id": uuid.uuid4(), "severity": "critica"},
+    )
+
+    response = post_reading(client, db, value="28.5")
+
+    assert response.status_code == 201
+    assert response.json()["severity"] == "advertencia"
+    assert not any("UPDATE alert_ticket_service.alerts" in sql for sql in db.statements)
+
+
+def test_lectura_levemente_fuera_de_rango_crea_alerta_advertencia(client):
+    db = FakeDatabase(threshold=THRESHOLD, alert_insert={"id": uuid.uuid4()})
+
+    response = post_reading(client, db, value="28.5")
+
+    assert response.status_code == 201
+    assert response.json()["severity"] == "advertencia"
+    assert response.json()["alert_created"] is True
+
+
+def test_lectura_muy_fuera_de_rango_crea_alerta_critica(client):
+    db = FakeDatabase(threshold=THRESHOLD, alert_insert={"id": uuid.uuid4()})
+
+    response = post_reading(client, db, value="12")
+
+    assert response.status_code == 201
+    assert response.json()["condition"] == "below_min"
+    assert response.json()["severity"] == "critica"
+    assert response.json()["alert_created"] is True
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("18", None),
+        ("28", None),
+        ("23", None),
+        ("28.99", ("above_max", "advertencia")),
+        ("29", ("above_max", "critica")),
+        ("17.01", ("below_min", "advertencia")),
+        ("17", ("below_min", "critica")),
+    ],
+)
+def test_clasificacion_de_severidad_en_los_limites(value, expected):
+    assert classify_threshold_breach(
+        Decimal(value),
+        THRESHOLD["min_value"],
+        THRESHOLD["max_value"],
+    ) == expected
