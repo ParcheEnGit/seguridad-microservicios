@@ -162,6 +162,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: telemetry-service
+      ROOT_PATH: /api/telemetry
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
