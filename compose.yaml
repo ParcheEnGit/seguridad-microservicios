@@ -142,9 +142,18 @@ services:
       SERVICE_NAME: device-service
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
+      DEVICE_IMAGES_PATH: /data/device-images
+    volumes:
+      - device_images:/data/device-images
     depends_on:
       database-migrations:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks: [backend]
     restart: unless-stopped
 
@@ -153,9 +162,19 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       SERVICE_NAME: telemetry-service
+      ROOT_PATH: /api/telemetry
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       database-migrations:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks: [backend]
     restart: unless-stopped
 
@@ -166,6 +185,9 @@ services:
       SERVICE_NAME: alert-ticket-service
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
+      TICKET_ATTACHMENTS_PATH: /data/ticket-attachments
+    volumes:
+      - ticket_attachments:/data/ticket-attachments
     depends_on:
       database-migrations:
         condition: service_completed_successfully
@@ -189,12 +211,14 @@ services:
     build: ./services/simulator-device
     environment:
       APP_ENV: ${APP_ENV}
-      TELEMETRY_URL: http://telemetry-service:8000/health
+      TELEMETRY_URL: http://telemetry-service:8000
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
+      SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-15}
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
     depends_on:
       telemetry-service:
-        condition: service_started
+        condition: service_healthy
     networks: [backend]
-    profiles: [simulator]
 
 networks:
   frontend:
@@ -204,3 +228,5 @@ networks:
 volumes:
   postgres_data:
   frontend_node_modules:
+  device_images:
+  ticket_attachments:

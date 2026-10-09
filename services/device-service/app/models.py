@@ -29,6 +29,9 @@ class Device(Base):
     thresholds: Mapped[list["Threshold"]] = relationship(
         back_populates="device", cascade="all, delete-orphan"
     )
+    photos: Mapped[list["DevicePhoto"]] = relationship(
+        back_populates="device", cascade="all, delete-orphan"
+    )
 
 
 class Threshold(Base):
@@ -48,3 +51,21 @@ class Threshold(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     device: Mapped[Device] = relationship(back_populates="thresholds")
+
+
+class DevicePhoto(Base):
+    __tablename__ = "device_photos"
+    __table_args__ = ({"schema": "device_service"},)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("device_service.devices.id", ondelete="CASCADE"))
+    storage_name: Mapped[str] = mapped_column(String(160), unique=True)
+    original_name: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(80))
+    size_bytes: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    device: Mapped[Device] = relationship(back_populates="photos")
+
+    @property
+    def url(self) -> str:
+        return f"/api/devices/devices/{self.device_id}/photos/{self.id}/content"

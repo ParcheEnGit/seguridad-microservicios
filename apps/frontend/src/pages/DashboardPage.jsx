@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
+  BarChart3,
   Database,
   Monitor,
   TrendingUp,
 } from "lucide-react";
 
 import { AdminDashboard } from "../components/dashboard/AdminDashboard.jsx";
+import { LineChart24h } from "../components/dashboard/LineChart24h.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { DeviceTable } from "../components/reader/DeviceTable.jsx";
 import { RecentAlerts } from "../components/reader/RecentAlerts.jsx";
 import { SummaryCard } from "../components/reader/SummaryCard.jsx";
 import { isAdmin } from "../constants/roles.js";
 import { fetchAlerts } from "../services/dashboardApi.js";
+import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
+import { AlertsPage } from "./AlertsPage.jsx";
+import { TicketsPage } from "./TicketsPage.jsx";
+import { TelemetryPage } from "./TelemetryPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -22,6 +29,18 @@ export function DashboardPage({ user, onLogout }) {
   const [alerts, setAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
+  const [ticketsEntry, setTicketsEntry] = useState({ view: "list", key: 0 });
+
+  function navigate(item) {
+    if (item === "tickets") setTicketsEntry((current) => ({ view: "list", key: current.key + 1 }));
+    setActiveItem(item);
+  }
+
+  function openTicketForm() {
+    setTicketsEntry((current) => ({ view: "create", key: current.key + 1 }));
+    setActiveItem("tickets");
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -71,6 +90,22 @@ export function DashboardPage({ user, onLogout }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (isAdmin(user.role)) return undefined;
+    let isMounted = true;
+    const loadTelemetry = async () => {
+      try {
+        const summary = await getTelemetrySummary();
+        if (isMounted) setTelemetry(summary);
+      } catch {
+        // El resto del Dashboard Lector continúa disponible si telemetría falla temporalmente.
+      }
+    };
+    loadTelemetry();
+    const timer = setInterval(loadTelemetry, 15 * 1000);
+    return () => { isMounted = false; clearInterval(timer); };
+  }, [user.role]);
+
   const activeDevices = devices.filter(
     (device) => device.status === "activo",
   ).length;
@@ -83,11 +118,17 @@ export function DashboardPage({ user, onLogout }) {
     <DashboardLayout
       user={user}
       activeItem={activeItem}
-      onNavigate={setActiveItem}
+      onNavigate={navigate}
       onLogout={onLogout}
     >
       {activeItem === "dispositivos" ? (
         <DevicesPage user={user} />
+      ) : activeItem === "alertas" ? (
+        <AlertsPage user={user} />
+      ) : activeItem === "tickets" ? (
+        <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} />
+      ) : activeItem === "telemetria" ? (
+        <TelemetryPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (
@@ -157,10 +198,8 @@ export function DashboardPage({ user, onLogout }) {
           )}
 
           {!isLoading && !error && (
-            <section
-              className="dashboard-grid dashboard-grid--main"
-              aria-label="Información de monitoreo"
-            >
+            <>
+            <section className="dashboard-grid dashboard-grid--main" aria-label="Información de monitoreo">
               <div className="reader-panel">
                 <div className="reader-panel__header">
                   <div>
@@ -194,8 +233,26 @@ export function DashboardPage({ user, onLogout }) {
                 </div>
 
                 <RecentAlerts alerts={alerts} />
+
+                <button
+                  type="button"
+                  className="ticket-outline-btn reader-report-btn"
+                  onClick={openTicketForm}
+                >
+                  <AlertTriangle size={17} aria-hidden="true" />
+                  Reportar condición
+                </button>
               </div>
             </section>
+
+            <section className="reader-panel reader-telemetry-panel" aria-label="Telemetría en tiempo real">
+              <div className="reader-panel__header">
+                <div><h2>Telemetría ambiental reciente</h2><p>Lecturas simuladas del ambiente actualizadas cada 15 segundos.</p></div>
+                <span className="reader-telemetry-panel__count">{telemetry ? `${telemetry.readings.today} hoy` : "Cargando..."}</span>
+              </div>
+              {telemetry?.chart_24h?.length ? <LineChart24h points={telemetry.chart_24h} /> : <div className="reader-empty-state"><BarChart3 className="reader-empty-state__icon" size={30} /><p>Aún no hay lecturas disponibles.</p><span>Las lecturas aparecerán cuando el simulador esté habilitado.</span></div>}
+            </section>
+            </>
           )}
 
           {!isAdmin(user.role) && (

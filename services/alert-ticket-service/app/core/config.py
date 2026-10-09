@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     cookie_name: str = "labsentinel_session"
+    ticket_attachments_path: str = "/data/ticket-attachments"
 
 
 @lru_cache

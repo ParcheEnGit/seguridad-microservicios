@@ -1,20 +1,25 @@
 import uuid
+from io import BytesIO
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import Device, Threshold
-from app.schemas import DeviceCreate, DeviceListResponse, DeviceResponse, DeviceStatusUpdate, DeviceUpdate, ThresholdInput, ThresholdResponse
+from app.core.config import Settings, get_settings
+from app.models import Device, DevicePhoto, Threshold
+from app.schemas import DeviceCreate, DeviceListResponse, DevicePhotoResponse, DeviceResponse, DeviceStatusUpdate, DeviceUpdate, ThresholdInput, ThresholdResponse
 from app.security import get_current_claims, require_admin
 
 router = APIRouter(prefix="/devices", tags=["dispositivos"])
 
 
 def get_device_or_404(device_id: uuid.UUID, db: Session) -> Device:
-    statement = select(Device).options(selectinload(Device.thresholds)).where(Device.id == device_id)
+    statement = select(Device).options(selectinload(Device.thresholds), selectinload(Device.photos)).where(Device.id == device_id)
     device = db.scalar(statement)
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
@@ -24,6 +29,7 @@ def get_device_or_404(device_id: uuid.UUID, db: Session) -> Device:
 @router.get("", response_model=DeviceListResponse, summary="Listar dispositivos")
 def list_devices(
     status_filter: str | None = Query(default=None, alias="status"),
+    device_type: str | None = Query(default=None, min_length=1, max_length=60),
     location: str | None = Query(default=None, min_length=1, max_length=120),
     search: str | None = Query(default=None, min_length=1, max_length=120),
     limit: int = Query(default=25, ge=1, le=100),
@@ -31,11 +37,13 @@ def list_devices(
     db: Session = Depends(get_db),
     _: dict = Depends(get_current_claims),
 ) -> DeviceListResponse:
-    statement = select(Device).options(selectinload(Device.thresholds))
+    statement = select(Device).options(selectinload(Device.thresholds), selectinload(Device.photos))
     count_statement = select(func.count(Device.id))
     filters = []
     if status_filter:
         filters.append(Device.status == status_filter)
+    if device_type:
+        filters.append(Device.device_type.ilike(f"%{device_type.strip()}%"))
     if location:
         filters.append(Device.location.ilike(f"%{location.strip()}%"))
     if search:
@@ -127,3 +135,109 @@ def replace_thresholds(
     )
     db.commit()
     return get_device_or_404(device_id, db).thresholds
+
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": (".jpg", b"\xff\xd8\xff"),
+    "image/png": (".png", b"\x89PNG\r\n\x1a\n"),
+    "image/webp": (".webp", b"RIFF"),
+}
+MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+MAX_PHOTOS_PER_DEVICE = 3
+
+
+def is_valid_image(content_type: str, content: bytes) -> bool:
+    expected = ALLOWED_IMAGE_TYPES.get(content_type)
+    if expected is None:
+        return False
+    _, signature = expected
+    return content.startswith(signature) and (
+        content_type != "image/webp" or content[8:12] == b"WEBP"
+    )
+
+
+def convert_to_webp(content: bytes) -> bytes:
+    try:
+        with Image.open(BytesIO(content)) as image:
+            image.load()
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+            output = BytesIO()
+            image.save(output, format="WEBP", quality=82, method=6)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La fotografía no contiene una imagen válida") from exc
+
+
+@router.post("/{device_id}/photos", response_model=DevicePhotoResponse, status_code=status.HTTP_201_CREATED, summary="Agregar fotografía a un dispositivo")
+async def upload_device_photo(
+    device_id: uuid.UUID,
+    photo: UploadFile = File(..., description="Fotografía JPEG, PNG o WebP de hasta 5 MB"),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    _: dict = Depends(require_admin),
+) -> DevicePhoto:
+    device = get_device_or_404(device_id, db)
+    photo_count = db.scalar(select(func.count(DevicePhoto.id)).where(DevicePhoto.device_id == device.id)) or 0
+    if photo_count >= MAX_PHOTOS_PER_DEVICE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cada dispositivo admite como máximo 3 fotografías")
+    content = await photo.read(MAX_IMAGE_SIZE_BYTES + 1)
+    content_type = photo.content_type or ""
+    if not content or len(content) > MAX_IMAGE_SIZE_BYTES or not is_valid_image(content_type, content):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La fotografía debe ser JPEG, PNG o WebP válida y no superar 5 MB")
+    webp_content = convert_to_webp(content)
+    if not webp_content or len(webp_content) > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo optimizar la fotografía dentro del límite permitido")
+    storage_name = f"{uuid.uuid4()}.webp"
+    images_path = Path(settings.device_images_path)
+    images_path.mkdir(parents=True, exist_ok=True)
+    file_path = images_path / storage_name
+    file_path.write_bytes(webp_content)
+    record = DevicePhoto(
+        device_id=device.id,
+        storage_name=storage_name,
+        original_name=Path(photo.filename or "fotografia").name[:255],
+        content_type="image/webp",
+        size_bytes=len(webp_content),
+    )
+    db.add(record)
+    try:
+        db.commit()
+        db.refresh(record)
+    except Exception:
+        db.rollback()
+        file_path.unlink(missing_ok=True)
+        raise
+    return record
+
+
+@router.get("/{device_id}/photos/{photo_id}/content", response_class=FileResponse, summary="Consultar fotografía de un dispositivo")
+def read_device_photo(
+    device_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    _: dict = Depends(get_current_claims),
+) -> FileResponse:
+    record = db.scalar(select(DevicePhoto).where(DevicePhoto.id == photo_id, DevicePhoto.device_id == device_id))
+    file_path = Path(settings.device_images_path) / record.storage_name if record else None
+    if record is None or not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fotografía no encontrada")
+    return FileResponse(file_path, media_type=record.content_type, filename=record.original_name)
+
+
+@router.delete("/{device_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar fotografía de un dispositivo")
+def delete_device_photo(
+    device_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    _: dict = Depends(require_admin),
+) -> None:
+    record = db.scalar(select(DevicePhoto).where(DevicePhoto.id == photo_id, DevicePhoto.device_id == device_id))
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fotografía no encontrada")
+    file_path = Path(settings.device_images_path) / record.storage_name
+    db.delete(record)
+    db.commit()
+    file_path.unlink(missing_ok=True)

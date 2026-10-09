@@ -2,8 +2,15 @@ import os
 
 from fastapi import FastAPI
 
+from app.routes import router as telemetry_router
+
 SERVICE_NAME = os.getenv("SERVICE_NAME", "telemetry-service")
-app = FastAPI(title="LabSentinel Telemetry Service", version="0.1.0")
+app = FastAPI(
+    title="LabSentinel Telemetry Service",
+    version="0.1.0",
+    root_path=os.getenv("ROOT_PATH", ""),
+)
+app.include_router(telemetry_router)
 
 
 @app.get("/health", tags=["system"])
