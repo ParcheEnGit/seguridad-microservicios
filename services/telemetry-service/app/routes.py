@@ -22,6 +22,18 @@ from app.security import get_current_claims, require_admin, require_simulator_ke
 
 router = APIRouter(tags=["telemetría"])
 
+READING_ERROR_RESPONSES = {
+    401: {"description": "Falta la cabecera X-Simulator-Key o no es válida"},
+    404: {"description": "El dispositivo no existe"},
+    409: {"description": "El dispositivo no está activo"},
+    422: {"description": "Datos inválidos o unidad distinta a la del umbral configurado"},
+}
+
+HISTORY_ERROR_RESPONSES = {
+    401: {"description": "Sesión ausente, inválida o expirada"},
+    422: {"description": "Parámetros inválidos o fecha inicial posterior a la final"},
+}
+
 DEFAULT_METRICS = (
     SimulationMetric(metric_code="temperatura", unit="°c", min_value=18, max_value=28),
     SimulationMetric(metric_code="humedad", unit="%", min_value=40, max_value=70),
@@ -143,6 +155,7 @@ def classify_threshold_breach(
     response_model=TelemetryReadingIngestResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar una lectura enviada por el simulador autorizado",
+    responses=READING_ERROR_RESPONSES,
 )
 def create_reading(
     payload: TelemetryReadingCreate,
@@ -345,9 +358,11 @@ def consume_simulation_peak(peak_id: UUID, _: None = Depends(require_simulator_k
     "/readings/history",
     response_model=TelemetryHistoryResponse,
     summary="Consultar historial de lecturas",
+    description="Devuelve las lecturas del dispositivo ordenadas de la más reciente a la más antigua.",
+    responses=HISTORY_ERROR_RESPONSES,
 )
 def reading_history(
-    device_id: str = Query(..., min_length=1),
+    device_id: UUID = Query(...),
     start_at: datetime = Query(...),
     end_at: datetime = Query(...),
     metric_code: str | None = Query(default=None, min_length=1, max_length=50),
