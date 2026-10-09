@@ -38,7 +38,7 @@ def simulated_value(metric: dict) -> float:
     return round(random.uniform(lower, upper), 2)
 
 
-def send_cycle() -> int:
+def send_cycle() -> tuple[int, dict[str, list[str]], int]:
     targets = request_json("/simulation-targets")
     pending_peaks = request_json("/simulation/peaks")
     peaks_by_metric = {
@@ -46,6 +46,8 @@ def send_cycle() -> int:
         for peak in pending_peaks
     }
     sent = 0
+    current_readings: dict[str, list[str]] = {}
+    history_readings = 0
     for target in targets:
         for metric in target["metrics"]:
             peak = peaks_by_metric.get((str(target["device_id"]), metric["metric_code"]))
@@ -57,6 +59,7 @@ def send_cycle() -> int:
                 timestamps = [now - timedelta(hours=hour) for hour in range(7 * 24, 0, -6)] + [now]
             for timestamp in timestamps:
                 is_peak_reading = peak is not None and timestamp == timestamps[-1]
+                value = peak["value"] if is_peak_reading else simulated_value(metric)
                 try:
                     request_json(
                         "/readings",
@@ -65,33 +68,53 @@ def send_cycle() -> int:
                             "device_id": target["device_id"],
                             "metric_code": metric["metric_code"],
                             "unit": metric["unit"],
-                            "value": peak["value"] if is_peak_reading else simulated_value(metric),
+                            "value": value,
                             "equipment_status": "operativo",
                             "recorded_at": timestamp.isoformat(),
                         },
                     )
                     sent += 1
+                    if timestamp == timestamps[-1]:
+                        kind = "PICO" if is_peak_reading else "normal"
+                        current_readings.setdefault(target["device_code"], []).append(
+                            f"{metric['metric_code']}={value} {metric['unit']} ({kind})"
+                        )
+                    else:
+                        history_readings += 1
                     if is_peak_reading:
                         request_json(f"/simulation/peaks/{peak['id']}/consume", method="POST", payload={})
-                        print(
-                            f"[PEAK] {target['device_code']} {metric['metric_code']}={peak['value']}{metric['unit']}",
-                            flush=True,
-                        )
                 except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-                    print(f"Reading skipped for {target['device_code']}: {exc}", flush=True)
-    return sent
+                    print(f"[ERROR] Lectura no enviada para {target['device_code']}: {exc}", flush=True)
+    return sent, current_readings, history_readings
 
 
 def main() -> None:
-    print(f"LabSentinel simulator enabled={SIMULATOR_ENABLED}; interval={INTERVAL_SECONDS}s", flush=True)
+    state = "activo" if SIMULATOR_ENABLED else "desactivado"
+    print(
+        f"LabSentinel | Simulador {state} | Intervalo: {INTERVAL_SECONDS} s",
+        flush=True,
+    )
     while True:
         if not SIMULATOR_ENABLED:
             time.sleep(60)
             continue
         try:
-            print(f"Simulator cycle completed: {send_cycle()} readings sent", flush=True)
+            sent, current_readings, history_readings = send_cycle()
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(
+                f"[CICLO {timestamp}] {sent} lecturas enviadas para "
+                f"{len(current_readings)} dispositivo(s)",
+                flush=True,
+            )
+            for device_code, readings in current_readings.items():
+                print(f"  └─ {device_code}: {' | '.join(readings)}", flush=True)
+            if history_readings:
+                print(
+                    f"  └─ Historial inicial: {history_readings} lecturas distribuidas en 7 días.",
+                    flush=True,
+                )
         except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-            print(f"Simulator cycle failed: {exc}", flush=True)
+            print(f"[ERROR] El ciclo de simulación falló: {exc}", flush=True)
         time.sleep(INTERVAL_SECONDS)
 
 
