@@ -19,6 +19,7 @@ import { fetchAlerts } from "../services/dashboardApi.js";
 import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
 import { DevicesPage } from "./DevicesPage.jsx";
+import { AlertsPage } from "./AlertsPage.jsx";
 import { TicketsPage } from "./TicketsPage.jsx";
 import { TelemetryPage } from "./TelemetryPage.jsx";
 
@@ -122,6 +123,8 @@ export function DashboardPage({ user, onLogout }) {
     >
       {activeItem === "dispositivos" ? (
         <DevicesPage user={user} />
+      ) : activeItem === "alertas" ? (
+        <AlertsPage user={user} />
       ) : activeItem === "tickets" ? (
         <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} />
       ) : activeItem === "telemetria" ? (

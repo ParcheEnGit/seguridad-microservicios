@@ -35,6 +35,14 @@ class TelemetryReadingResponse(BaseModel):
     received_at: datetime
 
 
+class TelemetryReadingIngestResponse(TelemetryReadingResponse):
+    out_of_range: bool = False
+    condition: Literal["below_min", "above_max"] | None = None
+    severity: Literal["advertencia", "critica"] | None = None
+    alert_id: UUID | None = None
+    alert_created: bool = False
+
+
 class SimulationMetric(BaseModel):
     metric_code: str
     unit: str
