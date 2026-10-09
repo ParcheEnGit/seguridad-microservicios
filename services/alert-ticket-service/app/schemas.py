@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 TicketCategory = Literal[
     "carcasa_rota",
@@ -55,3 +56,44 @@ class TicketDetailResponse(TicketResponse):
 class TicketListResponse(BaseModel):
     items: list[TicketResponse]
     total: int
+
+
+class AlertSummary(BaseModel):
+    id: uuid.UUID
+    device_id: uuid.UUID
+    device_name: str | None
+    device_code: str | None
+    reading_id: uuid.UUID
+    metric_code: str
+    value: Decimal
+    unit: str
+    threshold_min: Decimal | None
+    threshold_max: Decimal | None
+    condition: Literal["below_min", "above_max"]
+    severity: Literal["advertencia", "critica"]
+    status: Literal["abierta", "revisada", "cerrada"]
+    created_at: datetime
+    updated_at: datetime
+    type: str
+    deviceName: str | None
+    date: datetime
+
+
+class AlertReadingResponse(BaseModel):
+    id: uuid.UUID
+    metric_code: str
+    value: Decimal
+    unit: str
+    equipment_status: str | None
+    source: str
+    recorded_at: datetime
+    received_at: datetime
+    payload: dict = Field(default_factory=dict)
+
+
+class AlertDetailResponse(AlertSummary):
+    reading: AlertReadingResponse
+
+
+class AlertStatusUpdate(BaseModel):
+    status: Literal["abierta", "revisada", "cerrada"]

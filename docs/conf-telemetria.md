@@ -29,6 +29,10 @@ El intervalo mínimo es cinco segundos. Para detener solamente la generación, c
 }
 ```
 
+Cuando el dispositivo tiene un umbral para la métrica, cada lectura se compara con `device_service.thresholds`. Las lecturas fuera del rango se guardan y generan una alerta en `alert_ticket_service.alerts`. Mientras exista una alerta `abierta` o `revisada` para el mismo dispositivo y métrica, las siguientes lecturas anómalas no crean duplicados. La respuesta incluye `out_of_range`, `condition`, `severity`, `alert_id` y `alert_created`.
+
+La pantalla **Gestión de alertas** permite filtrar por dispositivo, severidad y estado, consultar la lectura asociada y, para administradores, marcar alertas en revisión o cerrarlas. La API de gestión está bajo `/api/alerts-tickets/alerts`; actualizar el estado usa `PATCH /api/alerts-tickets/alerts/{id}/status`.
+
 ## Demostración
 
 ```powershell

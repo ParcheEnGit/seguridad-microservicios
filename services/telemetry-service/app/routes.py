@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from threading import Lock
 from uuid import UUID, uuid4
 
@@ -14,6 +15,7 @@ from app.schemas import (
     SimulationTarget,
     TelemetryHistoryResponse,
     TelemetryReadingCreate,
+    TelemetryReadingIngestResponse,
     TelemetryReadingResponse,
 )
 from app.security import get_current_claims, require_admin, require_simulator_key
@@ -34,7 +36,7 @@ DEVICE_SQL = text("""
 """)
 
 THRESHOLD_SQL = text("""
-    SELECT unit
+    SELECT unit, min_value, max_value
     FROM device_service.thresholds
     WHERE device_id = :device_id AND metric_code = :metric_code
 """)
@@ -53,6 +55,21 @@ INSERT_READING_SQL = text("""
     VALUES
         (:device_id, :metric_code, :value, :unit, :equipment_status, 'simulador', :recorded_at, '{}'::jsonb)
     RETURNING id, device_id, metric_code, value, unit, equipment_status, source, recorded_at, received_at
+""")
+
+INSERT_ALERT_SQL = text("""
+    INSERT INTO alert_ticket_service.alerts (
+        device_id, reading_id, metric_code, value, unit,
+        threshold_min, threshold_max, severity
+    )
+    VALUES (
+        :device_id, :reading_id, :metric_code, :value, :unit,
+        :threshold_min, :threshold_max, :severity
+    )
+    ON CONFLICT (device_id, metric_code)
+        WHERE status IN ('abierta', 'revisada')
+    DO NOTHING
+    RETURNING id
 """)
 
 TARGETS_SQL = text("""
@@ -98,9 +115,32 @@ def normalize_recorded_at(value: datetime | None) -> datetime:
     return timestamp.astimezone(timezone.utc)
 
 
+def classify_threshold_breach(
+    value: Decimal,
+    min_value: Decimal,
+    max_value: Decimal,
+) -> tuple[str, str] | None:
+    allowed_range = max_value - min_value
+    if value < min_value:
+        condition = "below_min"
+        deviation = min_value - value
+    elif value > max_value:
+        condition = "above_max"
+        deviation = value - max_value
+    else:
+        return None
+
+    severity = (
+        "critica"
+        if deviation >= allowed_range * Decimal("0.10")
+        else "advertencia"
+    )
+    return condition, severity
+
+
 @router.post(
     "/readings",
-    response_model=TelemetryReadingResponse,
+    response_model=TelemetryReadingIngestResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar una lectura enviada por el simulador autorizado",
 )
@@ -115,7 +155,10 @@ def create_reading(
     if device["status"] != "activo":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El dispositivo no está activo para recibir lecturas")
 
-    threshold = db.execute(THRESHOLD_SQL, {"device_id": payload.device_id, "metric_code": payload.metric_code}).mappings().one_or_none()
+    threshold = db.execute(
+        THRESHOLD_SQL,
+        {"device_id": payload.device_id, "metric_code": payload.metric_code},
+    ).mappings().one_or_none()
     if threshold is not None and threshold["unit"].strip().lower() != payload.unit:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La unidad no coincide con el umbral configurado")
 
@@ -130,8 +173,75 @@ def create_reading(
             "recorded_at": normalize_recorded_at(payload.recorded_at),
         },
     ).mappings().one()
+
+    alert_id = None
+    alert_created = False
+    condition = None
+    severity = None
+    if threshold is not None:
+        anomaly = classify_threshold_breach(
+            payload.value,
+            threshold["min_value"],
+            threshold["max_value"],
+        )
+        if anomaly is not None:
+            condition, severity = anomaly
+            inserted_alert = db.execute(
+                INSERT_ALERT_SQL,
+                {
+                    "device_id": payload.device_id,
+                    "reading_id": row["id"],
+                    "metric_code": payload.metric_code,
+                    "value": payload.value,
+                    "unit": payload.unit,
+                    "threshold_min": threshold["min_value"],
+                    "threshold_max": threshold["max_value"],
+                    "severity": severity,
+                },
+            ).mappings().one_or_none()
+            alert_created = inserted_alert is not None
+
+            if inserted_alert is not None:
+                alert_id = inserted_alert["id"]
+            else:
+                existing_alert = db.execute(
+                    text("""
+                        SELECT id, severity
+                        FROM alert_ticket_service.alerts
+                        WHERE device_id = :device_id
+                          AND metric_code = :metric_code
+                          AND status IN ('abierta', 'revisada')
+                    """),
+                    {
+                        "device_id": payload.device_id,
+                        "metric_code": payload.metric_code,
+                    },
+                ).mappings().one_or_none()
+                if existing_alert is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="No se pudo confirmar la alerta activa; reintenta el envío",
+                    )
+                alert_id = existing_alert["id"]
+                if severity == "critica" and existing_alert["severity"] != "critica":
+                    db.execute(
+                        text("""
+                            UPDATE alert_ticket_service.alerts
+                            SET severity = 'critica', updated_at = NOW()
+                            WHERE id = :alert_id
+                        """),
+                        {"alert_id": alert_id},
+                    )
+
     db.commit()
-    return dict(row)
+    return {
+        **dict(row),
+        "out_of_range": condition is not None,
+        "condition": condition,
+        "severity": severity,
+        "alert_id": alert_id,
+        "alert_created": alert_created,
+    }
 
 @router.get(
     "/simulation-targets",
