@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { AdminDashboard } from "../components/dashboard/AdminDashboard.jsx";
+import { DeviceTelemetryChart } from "../components/dashboard/DeviceTelemetryChart.jsx";
 import { LineChart24h } from "../components/dashboard/LineChart24h.jsx";
 import { DashboardLayout } from "../components/layout/DashboardLayout.jsx";
 import { DeviceTable } from "../components/reader/DeviceTable.jsx";
@@ -126,7 +127,7 @@ export function DashboardPage({ user, onLogout }) {
       ) : activeItem === "alertas" ? (
         <AlertsPage user={user} />
       ) : activeItem === "tickets" ? (
-        <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} />
+        <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} user={user} />
       ) : activeItem === "telemetria" ? (
         <TelemetryPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
@@ -252,6 +253,7 @@ export function DashboardPage({ user, onLogout }) {
               </div>
               {telemetry?.chart_24h?.length ? <LineChart24h points={telemetry.chart_24h} /> : <div className="reader-empty-state"><BarChart3 className="reader-empty-state__icon" size={30} /><p>Aún no hay lecturas disponibles.</p><span>Las lecturas aparecerán cuando el simulador esté habilitado.</span></div>}
             </section>
+            <DeviceTelemetryChart />
             </>
           )}
 
