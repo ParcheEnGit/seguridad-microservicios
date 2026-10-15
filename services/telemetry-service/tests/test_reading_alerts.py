@@ -6,6 +6,7 @@ from decimal import Decimal
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg2://test:test@localhost:5432/test")
 os.environ.setdefault("JWT_SECRET", "test-secret-min-32-characters-long")
 os.environ.setdefault("SIMULATOR_API_KEY", "test-simulator-key")
+os.environ.setdefault("SMTP_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient
