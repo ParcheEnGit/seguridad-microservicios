@@ -19,3 +19,5 @@ def apply_migrations(engine: Engine) -> None:
             connection.execute(
                 text("ALTER TABLE users ADD COLUMN picture_url VARCHAR(2048)")
             )
+        if "google_id" in columns:
+            connection.execute(text("ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL"))
