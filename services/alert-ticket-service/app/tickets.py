@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db import get_db
-from app.schemas import TicketCategory, TicketDetailResponse, TicketListResponse, TicketStatus
-from app.security import ROLE_ADMIN, require_ticket_author
+from app.schemas import TicketCategory, TicketDetailResponse, TicketListResponse, TicketStatus, TicketStatusUpdate
+from app.security import ROLE_ADMIN, require_admin, require_ticket_author
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -46,6 +46,12 @@ TICKET_SELECT = """
     LEFT JOIN device_service.devices d ON d.id = t.device_id
     LEFT JOIN alert_ticket_service.ticket_attachments a ON a.ticket_id = t.id
 """
+
+NEXT_TICKET_STATUS = {
+    "abierto": "en_revision",
+    "en_revision": "resuelto",
+    "resuelto": "cerrado",
+}
 
 
 def to_ticket(row) -> dict:
@@ -199,12 +205,92 @@ def list_my_tickets(
     return {"items": [to_ticket(row) for row in rows], "total": total}
 
 
+@router.get("", response_model=TicketListResponse, summary="Listar tickets para gestión administrativa")
+def list_tickets(
+    status_filter: TicketStatus | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None, min_length=1, max_length=120),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> dict:
+    conditions: list[str] = []
+    params: dict = {"limit": limit, "offset": offset}
+    if status_filter:
+        conditions.append("t.status = :status")
+        params["status"] = status_filter
+    if search:
+        conditions.append(f"(d.name ILIKE :search OR d.device_code ILIKE :search OR t.description ILIKE :search OR {TICKET_CODE_SQL} ILIKE :search)")
+        params["search"] = f"%{search.strip()}%"
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = db.execute(
+        text(f"{TICKET_SELECT} {where} ORDER BY t.created_at DESC LIMIT :limit OFFSET :offset"),
+        params,
+    ).mappings().all()
+    total = db.execute(
+        text(f"SELECT COUNT(*) FROM alert_ticket_service.tickets t LEFT JOIN device_service.devices d ON d.id = t.device_id {where}"),
+        params,
+    ).scalar_one()
+    return {"items": [to_ticket(row) for row in rows], "total": total}
+
+
 @router.get("/{ticket_id}", response_model=TicketDetailResponse, summary="Consultar detalle de un ticket propio")
 def get_ticket(
     ticket_id: uuid.UUID,
     db: Session = Depends(get_db),
     claims: dict = Depends(require_ticket_author),
 ) -> dict:
+    return read_ticket(ticket_id, db, claims)
+
+
+@router.patch("/{ticket_id}/status", response_model=TicketDetailResponse, summary="Actualizar estado de un ticket")
+def update_ticket_status(
+    ticket_id: uuid.UUID,
+    payload: TicketStatusUpdate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(require_admin),
+) -> dict:
+    ticket = db.execute(
+        text("SELECT status FROM alert_ticket_service.tickets WHERE id = :ticket_id FOR UPDATE"),
+        {"ticket_id": ticket_id},
+    ).mappings().one_or_none()
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado")
+    current_status = ticket["status"]
+    if payload.status != current_status and NEXT_TICKET_STATUS.get(current_status) != payload.status:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No se puede pasar de '{current_status}' a '{payload.status}'",
+        )
+    if payload.status != current_status:
+        db.execute(
+            text("""
+                UPDATE alert_ticket_service.tickets
+                SET status = :status,
+                    resolved_by_user_id = CASE WHEN :status = 'resuelto' THEN :user_id ELSE resolved_by_user_id END,
+                    resolved_at = CASE WHEN :status = 'resuelto' THEN NOW() ELSE resolved_at END,
+                    closed_by_user_id = CASE WHEN :status = 'cerrado' THEN :user_id ELSE closed_by_user_id END,
+                    closed_at = CASE WHEN :status = 'cerrado' THEN NOW() ELSE closed_at END,
+                    updated_at = NOW()
+                WHERE id = :ticket_id
+            """),
+            {"ticket_id": ticket_id, "status": payload.status, "user_id": claims["user_id"]},
+        )
+        db.execute(
+            text("""
+                INSERT INTO alert_ticket_service.ticket_status_history
+                    (ticket_id, previous_status, new_status, changed_by_user_id, note)
+                VALUES (:ticket_id, :previous_status, :new_status, :user_id, :note)
+            """),
+            {
+                "ticket_id": ticket_id,
+                "previous_status": current_status,
+                "new_status": payload.status,
+                "user_id": claims["user_id"],
+                "note": payload.note.strip() if payload.note else None,
+            },
+        )
+        db.commit()
     return read_ticket(ticket_id, db, claims)
 
 
