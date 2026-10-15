@@ -32,3 +32,7 @@ class UserInviteCreate(BaseModel):
     name: str = Field(min_length=2, max_length=255)
     email: EmailStr
     role: Literal[0, 1]
+
+
+class UserRoleUpdate(BaseModel):
+    role: Literal[0, 1]
