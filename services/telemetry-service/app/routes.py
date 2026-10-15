@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from threading import Lock
 from uuid import UUID, uuid4
 
@@ -54,6 +55,14 @@ THRESHOLD_SQL = text("""
     SELECT unit, min_value, max_value
     FROM device_service.thresholds
     WHERE device_id = :device_id AND metric_code = :metric_code
+""")
+
+DEVICE_PHOTO_SQL = text("""
+    SELECT storage_name
+    FROM device_service.device_photos
+    WHERE device_id = :device_id
+    ORDER BY created_at ASC
+    LIMIT 1
 """)
 
 PEAK_TARGET_SQL = text("""
@@ -266,6 +275,8 @@ def create_reading(
             text("SELECT email FROM public.users WHERE role = 0 AND email IS NOT NULL")
         ).mappings().all()
         recipients.update(str(row["email"]).strip().lower() for row in admin_rows if row["email"])
+        photo = db.execute(DEVICE_PHOTO_SQL, {"device_id": payload.device_id}).mappings().one_or_none()
+        photo_path = Path(settings.device_images_path) / photo["storage_name"] if photo else None
         background_tasks.add_task(
             send_alert_email,
             settings=settings,
@@ -280,6 +291,7 @@ def create_reading(
             condition=condition,
             severity=severity,
             event=payload.payload.get("simulation_event"),
+            device_photo_path=photo_path,
         )
     return {
         **dict(row),
