@@ -61,11 +61,7 @@ def send_alert_email(
         "pico_aleatorio": "pico aleatorio del simulador",
     }.get(event or "", "lectura fuera de umbral")
 
-    message = EmailMessage()
-    message["Subject"] = f"[LabSentinel] Alerta {severity}: {device}"
-    message["From"] = settings.smtp_from
-    message["To"] = ", ".join(sorted(recipients))
-    message.set_content(
+    content = (
         "LabSentinel detectó una condición anómala.\n\n"
         f"Dispositivo: {device}\n"
         f"Métrica: {metric_code}\n"
@@ -78,19 +74,17 @@ def send_alert_email(
         "Ingresa al Dashboard Admin de LabSentinel para revisar y gestionar la alerta."
     )
 
+    photo_content = None
     if device_photo_path and device_photo_path.is_file():
         try:
-            message.add_attachment(
-                device_photo_path.read_bytes(),
-                maintype="image",
-                subtype="webp",
-                filename=f"{device_code or 'dispositivo'}-alerta.webp",
-            )
+            photo_content = device_photo_path.read_bytes()
         except OSError as exc:
             # No se sacrifica la alerta por una fotografía que fue eliminada o no
             # está montada temporalmente en este servicio.
             logger.warning("No se pudo adjuntar la fotografía del dispositivo: %s", exc)
 
+    delivered = 0
+    failed = 0
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(
@@ -100,8 +94,27 @@ def send_alert_email(
             context=context,
         ) as smtp:
             smtp.login(settings.smtp_username, password)
-            smtp.send_message(message)
-        logger.info("Correo de alerta enviado a %d administrador(es)", len(recipients))
+            for recipient in sorted(recipients):
+                message = EmailMessage()
+                message["Subject"] = f"[LabSentinel] Alerta {severity}: {device}"
+                message["From"] = settings.smtp_from
+                # Un mensaje por destinatario evita divulgar la lista de admins.
+                message["To"] = recipient
+                message.set_content(content)
+                if photo_content:
+                    message.add_attachment(
+                        photo_content,
+                        maintype="image",
+                        subtype="webp",
+                        filename=f"{device_code or 'dispositivo'}-alerta.webp",
+                    )
+                refused = smtp.send_message(message)
+                if refused:
+                    failed += 1
+                    logger.warning("El proveedor SMTP rechazó el correo de alerta para %s", recipient)
+                else:
+                    delivered += 1
+        logger.info("Correo de alerta enviado a %d administrador(es); %d rechazado(s)", delivered, failed)
     except (OSError, smtplib.SMTPException) as exc:
         # La telemetría y la alerta ya quedaron persistidas; un fallo de correo no
         # puede perder la evidencia ni detener el simulador.
