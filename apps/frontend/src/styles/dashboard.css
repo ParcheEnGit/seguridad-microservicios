@@ -2858,6 +2858,9 @@
 .users-role--reader { background: #eef6f1; color: #227147; }
 .users-google { background: #f1f3f2; color: #708078; }
 .users-google--linked { background: #eef8f2; color: #168044; }
+.users-remove-btn { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; padding: 7px 9px; background: #fff0ef; color: #ba2b23; font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.users-remove-btn:hover:not(:disabled) { background: #ffe0de; }
+.users-remove-btn:disabled { opacity: .6; cursor: wait; }
 .users-modal { max-width: 550px; }
 .users-access-note { display: flex; gap: 8px; margin: 0; color: #64766b; font-size: .81rem; line-height: 1.45; }
 .users-access-note svg { flex: 0 0 auto; margin-top: 1px; color: #0b5a3b; }
@@ -2881,5 +2884,5 @@
 
   .users-table-card__header { padding: 14px 16px; }
   .users-table-card .devices-table-wrap { overflow-x: auto; }
-  .users-table-card table { min-width: 620px; }
+  .users-table-card table { min-width: 720px; }
 }
