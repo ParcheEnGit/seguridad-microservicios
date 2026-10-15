@@ -1,6 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.roles import ROLE_ADMIN
 from app.db.models import User
 
 
@@ -45,6 +46,13 @@ class UserRepository:
     def has_users(self) -> bool:
         """Indica si la lista de autorización ya fue inicializada."""
         return self.db.scalar(select(User.id).limit(1)) is not None
+
+    def count_administrators(self) -> int:
+        return int(self.db.scalar(select(func.count(User.id)).where(User.role == ROLE_ADMIN)) or 0)
+
+    def delete(self, user: User) -> None:
+        self.db.delete(user)
+        self.db.commit()
 
     def invite(self, *, name: str, email: str, role: int) -> User:
         return self.create(
