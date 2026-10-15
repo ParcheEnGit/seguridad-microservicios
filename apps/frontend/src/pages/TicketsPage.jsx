@@ -12,7 +12,8 @@ import {
   getStatusLabel,
 } from "../constants/tickets.js";
 import { listDevices } from "../services/deviceApi.js";
-import { createTicket, getTicket, listMyTickets } from "../services/ticketApi.js";
+import { isAdmin } from "../constants/roles.js";
+import { createTicket, getTicket, listMyTickets, listTickets, updateTicketStatus } from "../services/ticketApi.js";
 
 const REDIRECT_DELAY_MS = 3000;
 const EMPTY_FORM = { deviceId: "", category: "", description: "" };
@@ -224,13 +225,32 @@ function TicketForm({ onCancel, onCreated, onView }) {
   );
 }
 
-function TicketDetailModal({ ticketId, onClose }) {
+const NEXT_STATUS = { abierto: "en_revision", en_revision: "resuelto", resuelto: "cerrado" };
+
+function TicketDetailModal({ ticketId, onClose, admin, onUpdated }) {
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useEffect(() => {
     getTicket(ticketId).then(setTicket).catch((requestError) => setError(requestError.message));
   }, [ticketId]);
+
+  async function advanceStatus() {
+    const nextStatus = NEXT_STATUS[ticket?.status];
+    if (!nextStatus) return;
+    setSavingStatus(true);
+    setError("");
+    try {
+      const updated = await updateTicketStatus(ticket.id, nextStatus);
+      setTicket(updated);
+      onUpdated();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   return (
     <div className="device-modal-backdrop" role="presentation" onClick={onClose}>
@@ -277,6 +297,13 @@ function TicketDetailModal({ ticketId, onClose }) {
                   </li>
                 ))}
               </ol>
+              {admin && NEXT_STATUS[ticket.status] && (
+                <div className="device-form-actions">
+                  <button type="button" className="device-primary-btn" disabled={savingStatus} onClick={advanceStatus}>
+                    {savingStatus ? "Actualizando..." : `Marcar como ${getStatusLabel(NEXT_STATUS[ticket.status])}`}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -285,7 +312,7 @@ function TicketDetailModal({ ticketId, onClose }) {
   );
 }
 
-function TicketList({ onCreate, onView }) {
+function TicketList({ onCreate, onView, admin, refreshKey }) {
   const [tickets, setTickets] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -298,7 +325,7 @@ function TicketList({ onCreate, onView }) {
     setLoading(true);
     setError("");
     try {
-      const data = await listMyTickets({ search: search.trim(), status: statusFilter, limit: 100 });
+      const data = await (admin ? listTickets : listMyTickets)({ search: search.trim(), status: statusFilter, limit: 100 });
       setTickets(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (requestError) {
@@ -311,12 +338,12 @@ function TicketList({ onCreate, onView }) {
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, admin, refreshKey]);
 
   return (
     <section className="tickets-page">
       <header className="devices-header">
-        <div><h1>Mis tickets</h1><p>{total} ticket{total === 1 ? "" : "s"} {filtered ? "encontrado" : "enviado"}{total === 1 ? "" : "s"}</p></div>
+        <div><h1>{admin ? "Gestión de tickets" : "Mis tickets"}</h1><p>{total} ticket{total === 1 ? "" : "s"} {filtered ? "encontrado" : admin ? "registrado" : "enviado"}{total === 1 ? "" : "s"}</p></div>
         <button type="button" className="ticket-outline-btn ticket-create-btn" onClick={onCreate}><Plus size={17} /> Reportar condición</button>
       </header>
 
@@ -339,7 +366,7 @@ function TicketList({ onCreate, onView }) {
         {loading ? <p className="device-muted">Cargando tickets...</p> : tickets.length === 0 ? (
           <div className="device-empty">
             <Ticket size={28} />
-            <p>{filtered ? "No se encontraron tickets con esos filtros." : "Aún no registraste tickets."}</p>
+            <p>{filtered ? "No se encontraron tickets con esos filtros." : admin ? "No hay tickets registrados." : "Aún no registraste tickets."}</p>
             {!filtered && <button type="button" className="device-link-btn" onClick={onCreate}>Reportar una condición</button>}
           </div>
         ) : (
@@ -379,16 +406,18 @@ function TicketList({ onCreate, onView }) {
   );
 }
 
-export function TicketsPage({ initialView = "list" }) {
+export function TicketsPage({ initialView = "list", user }) {
   const [view, setView] = useState(initialView);
   const [selectedId, setSelectedId] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const admin = isAdmin(user?.role);
 
   return (
     <>
       {view === "create"
         ? <TicketForm onCancel={() => setView("list")} onCreated={() => setView("list")} onView={(ticket) => { setView("list"); setSelectedId(ticket.id); }} />
-        : <TicketList onCreate={() => setView("create")} onView={(ticket) => setSelectedId(ticket.id)} />}
-      {selectedId && <TicketDetailModal ticketId={selectedId} onClose={() => setSelectedId(null)} />}
+        : <TicketList admin={admin} refreshKey={refreshKey} onCreate={() => setView("create")} onView={(ticket) => setSelectedId(ticket.id)} />}
+      {selectedId && <TicketDetailModal ticketId={selectedId} admin={admin} onUpdated={() => setRefreshKey((key) => key + 1)} onClose={() => setSelectedId(null)} />}
     </>
   );
 }
