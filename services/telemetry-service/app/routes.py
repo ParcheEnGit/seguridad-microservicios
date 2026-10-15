@@ -256,7 +256,11 @@ def create_reading(
                     notify_alert = True
 
     db.commit()
-    if notify_alert and settings.smtp_enabled:
+    is_first_forced_peak = (
+        payload.payload.get("simulation_event") == "pico_forzado"
+        and payload.payload.get("simulation_peak_first_reading") is True
+    )
+    if (notify_alert or is_first_forced_peak) and settings.smtp_enabled:
         recipients = configured_recipients(settings.alert_email_recipients)
         admin_rows = db.execute(
             text("SELECT email FROM public.users WHERE role = 0 AND email IS NOT NULL")
@@ -352,6 +356,7 @@ def create_simulation_peak(
         "metric_code": target["metric_code"],
         "unit": target["unit"].strip().lower(),
         "value": round(value, 2),
+        "cycles_total": payload.cycles,
         "cycles_remaining": payload.cycles,
         "created_at": datetime.now(timezone.utc),
     }
