@@ -78,5 +78,6 @@ class SimulationPeak(BaseModel):
     metric_code: str
     unit: str
     value: float
+    cycles_total: int
     cycles_remaining: int
     created_at: datetime
