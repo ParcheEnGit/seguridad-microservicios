@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Mail, Plus, RefreshCw, ShieldCheck, UserRound, Users, X } from "lucide-react";
+import { CheckCircle2, Mail, Plus, RefreshCw, ShieldCheck, Trash2, UserRound, Users, X } from "lucide-react";
 
 import { getRoleLabel } from "../constants/roles.js";
-import { authorizeUser, listAuthorizedUsers } from "../services/authApi.js";
+import { authorizeUser, listAuthorizedUsers, revokeUser } from "../services/authApi.js";
 
 const EMPTY_FORM = { name: "", email: "", role: "1" };
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,6 +56,7 @@ export function UsersPage() {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [notice, setNotice] = useState("");
+  const [removingId, setRemovingId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +78,22 @@ export function UsersPage() {
     load();
   }
 
+  async function removeUser(user) {
+    if (!window.confirm(`¿Revocar el acceso de ${user.name}? Ya no podrá iniciar sesión con ${user.email}.`)) return;
+    setRemovingId(user.id);
+    setError("");
+    setNotice("");
+    try {
+      await revokeUser(user.id);
+      setNotice(`Se revocó el acceso de ${user.email}.`);
+      await load();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return (
     <section className="users-page">
       <header className="devices-header">
@@ -88,7 +105,7 @@ export function UsersPage() {
       {error && <p className="device-form-error" role="alert">No se pudieron cargar los usuarios: {error}</p>}
       <section className="devices-table-card users-table-card">
         <header className="users-table-card__header"><div><Users size={19} /><strong>Usuarios autorizados</strong><span>{users.length}</span></div><button type="button" className="device-link-btn" onClick={load} disabled={loading}><RefreshCw size={15} /> Actualizar</button></header>
-        {loading ? <p className="device-muted">Cargando usuarios...</p> : users.length === 0 ? <div className="device-empty"><UserRound size={28} /><p>Aún no hay usuarios autorizados.</p></div> : <div className="devices-table-wrap"><table><thead><tr><th>Usuario</th><th>Correo autorizado</th><th>Rol</th><th>Estado de Google</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong></td><td><span className="users-email"><Mail size={15} /> {user.email}</span></td><td><span className={`users-role users-role--${user.role === 0 ? "admin" : "reader"}`}>{getRoleLabel(user.role)}</span></td><td><span className={user.google_id ? "users-google users-google--linked" : "users-google"}>{user.google_id ? "Vinculado" : "Pendiente de primer acceso"}</span></td></tr>)}</tbody></table></div>}
+        {loading ? <p className="device-muted">Cargando usuarios...</p> : users.length === 0 ? <div className="device-empty"><UserRound size={28} /><p>Aún no hay usuarios autorizados.</p></div> : <div className="devices-table-wrap"><table><thead><tr><th>Usuario</th><th>Correo autorizado</th><th>Rol</th><th>Estado de Google</th><th aria-label="Acciones" /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.name}</strong></td><td><span className="users-email"><Mail size={15} /> {user.email}</span></td><td><span className={`users-role users-role--${user.role === 0 ? "admin" : "reader"}`}>{getRoleLabel(user.role)}</span></td><td><span className={user.google_id ? "users-google users-google--linked" : "users-google"}>{user.google_id ? "Vinculado" : "Pendiente de primer acceso"}</span></td><td><button type="button" className="users-remove-btn" onClick={() => removeUser(user)} disabled={removingId === user.id} aria-label={`Revocar acceso de ${user.name}`} title="Revocar acceso"><Trash2 size={16} /> <span>{removingId === user.id ? "Revocando..." : "Revocar"}</span></button></td></tr>)}</tbody></table></div>}
       </section>
       {showModal && <AddUserModal onClose={() => setShowModal(false)} onCreated={created} />}
     </section>
