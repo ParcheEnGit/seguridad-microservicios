@@ -60,13 +60,16 @@ def rare_peak_value(metric: dict) -> tuple[float, str] | None:
     )
 
 
-def snmp_payload(metric: dict, event: str) -> dict:
+def snmp_payload(metric: dict, event: str, peak: dict | None = None) -> dict:
     return {
         "protocol": "SNMP",
         "snmp_version": "v2c",
         "oid": SNMP_OIDS.get(metric["metric_code"], "1.3.6.1.4.1.53864.1.1.255.0"),
         "transport": "simulado",
         "simulation_event": event,
+        "simulation_peak_first_reading": bool(
+            peak and peak["cycles_remaining"] == peak.get("cycles_total", peak["cycles_remaining"])
+        ),
     }
 
 
@@ -106,7 +109,7 @@ def send_cycle() -> tuple[int, dict[str, list[str]], int]:
                             "value": value,
                             "equipment_status": "operativo",
                             "recorded_at": timestamp.isoformat(),
-                            "payload": snmp_payload(metric, event),
+                            "payload": snmp_payload(metric, event, peak if is_peak_reading else None),
                         },
                     )
                     sent += 1
