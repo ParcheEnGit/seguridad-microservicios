@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_from: str = ""
     alert_email_recipients: str = ""
+    device_images_path: str = "/data/device-images"
 
 
 @lru_cache
