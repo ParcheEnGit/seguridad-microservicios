@@ -7,6 +7,7 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
+from pathlib import Path
 
 from app.core.config import Settings
 
@@ -35,6 +36,7 @@ def send_alert_email(
     condition: str,
     severity: str,
     event: str | None,
+    device_photo_path: Path | None = None,
 ) -> None:
     """Envía un aviso TLS sin interrumpir el registro de telemetría."""
     if not settings.smtp_enabled or not recipients:
@@ -71,9 +73,23 @@ def send_alert_email(
         f"Umbral permitido: {threshold_min} a {threshold_max} {unit}\n"
         f"Condición: {direction}\n"
         f"Severidad: {severity}\n"
-        f"Origen: {event_label}\n\n"
+        f"Origen: {event_label}\n"
+        f"Fotografía adjunta: {'sí' if device_photo_path and device_photo_path.is_file() else 'no disponible'}\n\n"
         "Ingresa al Dashboard Admin de LabSentinel para revisar y gestionar la alerta."
     )
+
+    if device_photo_path and device_photo_path.is_file():
+        try:
+            message.add_attachment(
+                device_photo_path.read_bytes(),
+                maintype="image",
+                subtype="webp",
+                filename=f"{device_code or 'dispositivo'}-alerta.webp",
+            )
+        except OSError as exc:
+            # No se sacrifica la alerta por una fotografía que fue eliminada o no
+            # está montada temporalmente en este servicio.
+            logger.warning("No se pudo adjuntar la fotografía del dispositivo: %s", exc)
 
     try:
         context = ssl.create_default_context()
