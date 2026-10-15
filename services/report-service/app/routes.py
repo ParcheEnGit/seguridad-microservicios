@@ -139,7 +139,7 @@ def device_telemetry(
     period: str = Query(default="24h"),
     resolution: str = Query(default="5m"),
     db: Session = Depends(get_db),
-    _: dict = Depends(require_admin),
+    _: dict = Depends(get_current_claims),
 ) -> DeviceTelemetrySeries:
     if period not in SERIES_OPTIONS or resolution not in RESOLUTION_OPTIONS:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Periodo o resolución no permitidos")
