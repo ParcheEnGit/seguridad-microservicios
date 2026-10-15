@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, PasswordLoginRequest, UserInviteCreate, UserResponse
+from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, PasswordLoginRequest, UserInviteCreate, UserResponse, UserRoleUpdate
 from app.auth.cookies import clear_session_cookie, set_session_cookie
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.auth.google import GoogleTokenVerificationError, verify_google_id_token
@@ -150,6 +150,32 @@ def delete_authorized_user(
         )
     repository.delete(target)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse, summary="Cambiar el rol de un usuario autorizado")
+def update_authorized_user_role(
+    user_id: int,
+    payload: UserRoleUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+) -> User:
+    repository = UserRepository(db)
+    target = repository.get_by_id(user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    if target.id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No puedes cambiar tu propio rol mientras tienes una sesión activa",
+        )
+    if target.role == payload.role:
+        return target
+    if target.role == 0 and payload.role == 1 and repository.count_administrators() <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Debe permanecer al menos un administrador autorizado",
+        )
+    return repository.update_role(target, payload.role)
 
 
 @router.post("/logout")
