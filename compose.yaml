@@ -166,6 +166,13 @@ services:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ALERT_EMAIL_RECIPIENTS: ${ALERT_EMAIL_RECIPIENTS:-}
     depends_on:
       database-migrations:
         condition: service_completed_successfully
@@ -215,6 +222,7 @@ services:
       SIMULATOR_API_KEY: ${SIMULATOR_API_KEY}
       SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-15}
       SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
+      SIMULATOR_RARE_PEAK_PROBABILITY: ${SIMULATOR_RARE_PEAK_PROBABILITY:-0.00005}
     depends_on:
       telemetry-service:
         condition: service_healthy
