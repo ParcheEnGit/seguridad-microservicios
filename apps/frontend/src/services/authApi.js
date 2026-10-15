@@ -101,3 +101,13 @@ export async function revokeUser(userId) {
   if (response.status === 204) return;
   return parseJsonResponse(response);
 }
+
+export async function updateUserRole(userId, role) {
+  const response = await fetch(`${API_BASE_URL}/auth/users/${userId}/role`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  return parseJsonResponse(response);
+}
