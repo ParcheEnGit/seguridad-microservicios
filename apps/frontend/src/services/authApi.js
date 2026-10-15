@@ -74,3 +74,21 @@ export async function logout() {
 
   return parseJsonResponse(response);
 }
+
+export async function listAuthorizedUsers() {
+  const response = await fetch(`${API_BASE_URL}/auth/users`, {
+    method: "GET",
+    credentials: "include",
+  });
+  return parseJsonResponse(response);
+}
+
+export async function authorizeUser({ name, email, role }) {
+  const response = await fetch(`${API_BASE_URL}/auth/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email, role }),
+  });
+  return parseJsonResponse(response);
+}
