@@ -11,7 +11,8 @@ from pathlib import Path
 
 from app.core.config import Settings
 
-logger = logging.getLogger(__name__)
+# Conserva las trazas SMTP junto a los logs operativos del contenedor.
+logger = logging.getLogger("uvicorn.error")
 
 
 def configured_recipients(raw_recipients: str) -> set[str]:
@@ -37,20 +38,20 @@ def send_alert_email(
     severity: str,
     event: str | None,
     device_photo_path: Path | None = None,
-) -> None:
+) -> tuple[int, int]:
     """Envía un aviso TLS sin interrumpir el registro de telemetría."""
     if not settings.smtp_enabled or not recipients:
-        return
+        return 0, 0
     if not all((settings.smtp_host, settings.smtp_username, settings.smtp_from)):
         logger.warning("Correo de alertas omitido: la configuración SMTP está incompleta")
-        return
+        return 0, 0
 
     # Google muestra las contraseñas de aplicación agrupadas con espacios; SMTP
     # recibe el token continuo. También tolera proveedores que no las agrupan.
     password = "".join(settings.smtp_password.get_secret_value().split())
     if not password:
         logger.warning("Correo de alertas omitido: falta SMTP_PASSWORD")
-        return
+        return 0, 0
 
     device = device_name or device_code or "Dispositivo sin nombre"
     if device_code and device_code != device:
@@ -119,3 +120,5 @@ def send_alert_email(
         # La telemetría y la alerta ya quedaron persistidas; un fallo de correo no
         # puede perder la evidencia ni detener el simulador.
         logger.error("No se pudo enviar el correo de alerta: %s", exc)
+        failed = max(failed, len(recipients) - delivered)
+    return delivered, failed
