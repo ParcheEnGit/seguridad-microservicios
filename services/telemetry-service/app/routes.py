@@ -1,13 +1,16 @@
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from threading import Lock
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.db import get_db
+from app.notifications import configured_recipients, send_alert_email
 from app.schemas import (
     SimulationMetric,
     SimulationPeak,
@@ -42,7 +45,7 @@ SIMULATION_PEAKS: dict[UUID, dict] = {}
 SIMULATION_PEAKS_LOCK = Lock()
 
 DEVICE_SQL = text("""
-    SELECT id, status
+    SELECT id, name, device_code, status
     FROM device_service.devices
     WHERE id = :device_id
 """)
@@ -65,7 +68,7 @@ INSERT_READING_SQL = text("""
     INSERT INTO telemetry_service.readings
         (device_id, metric_code, value, unit, equipment_status, source, recorded_at, payload)
     VALUES
-        (:device_id, :metric_code, :value, :unit, :equipment_status, 'simulador', :recorded_at, '{}'::jsonb)
+        (:device_id, :metric_code, :value, :unit, :equipment_status, 'simulador', :recorded_at, CAST(:payload AS jsonb))
     RETURNING id, device_id, metric_code, value, unit, equipment_status, source, recorded_at, received_at
 """)
 
@@ -159,7 +162,9 @@ def classify_threshold_breach(
 )
 def create_reading(
     payload: TelemetryReadingCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
     _: None = Depends(require_simulator_key),
 ) -> dict:
     device = db.execute(DEVICE_SQL, {"device_id": payload.device_id}).mappings().one_or_none()
@@ -184,6 +189,7 @@ def create_reading(
             "unit": payload.unit,
             "equipment_status": payload.equipment_status,
             "recorded_at": normalize_recorded_at(payload.recorded_at),
+            "payload": json.dumps(payload.payload),
         },
     ).mappings().one()
 
@@ -191,6 +197,7 @@ def create_reading(
     alert_created = False
     condition = None
     severity = None
+    notify_alert = False
     if threshold is not None:
         anomaly = classify_threshold_breach(
             payload.value,
@@ -216,6 +223,7 @@ def create_reading(
 
             if inserted_alert is not None:
                 alert_id = inserted_alert["id"]
+                notify_alert = True
             else:
                 existing_alert = db.execute(
                     text("""
@@ -245,8 +253,30 @@ def create_reading(
                         """),
                         {"alert_id": alert_id},
                     )
+                    notify_alert = True
 
     db.commit()
+    if notify_alert and settings.smtp_enabled:
+        recipients = configured_recipients(settings.alert_email_recipients)
+        admin_rows = db.execute(
+            text("SELECT email FROM public.users WHERE role = 0 AND email IS NOT NULL")
+        ).mappings().all()
+        recipients.update(str(row["email"]).strip().lower() for row in admin_rows if row["email"])
+        background_tasks.add_task(
+            send_alert_email,
+            settings=settings,
+            recipients=recipients,
+            device_name=device["name"],
+            device_code=device["device_code"],
+            metric_code=payload.metric_code,
+            value=payload.value,
+            unit=payload.unit,
+            threshold_min=threshold["min_value"],
+            threshold_max=threshold["max_value"],
+            condition=condition,
+            severity=severity,
+            event=payload.payload.get("simulation_event"),
+        )
     return {
         **dict(row),
         "out_of_range": condition is not None,
@@ -282,6 +312,7 @@ def simulation_targets(
                     unit=row["unit"].strip().lower(),
                     min_value=row["min_value"],
                     max_value=row["max_value"],
+                has_threshold=True,
                 )
             )
 
