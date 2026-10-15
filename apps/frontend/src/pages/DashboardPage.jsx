@@ -23,6 +23,7 @@ import { DevicesPage } from "./DevicesPage.jsx";
 import { AlertsPage } from "./AlertsPage.jsx";
 import { TicketsPage } from "./TicketsPage.jsx";
 import { TelemetryPage } from "./TelemetryPage.jsx";
+import { UsersPage } from "./UsersPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -130,6 +131,8 @@ export function DashboardPage({ user, onLogout }) {
         <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} user={user} />
       ) : activeItem === "telemetria" ? (
         <TelemetryPage />
+      ) : activeItem === "usuarios" && isAdmin(user.role) ? (
+        <UsersPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (
