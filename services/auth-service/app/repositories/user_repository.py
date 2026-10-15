@@ -54,6 +54,12 @@ class UserRepository:
         self.db.delete(user)
         self.db.commit()
 
+    def update_role(self, user: User, role: int) -> User:
+        user.role = role
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
     def invite(self, *, name: str, email: str, role: int) -> User:
         return self.create(
             google_id=None,
