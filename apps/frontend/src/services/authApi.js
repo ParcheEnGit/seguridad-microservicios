@@ -92,3 +92,12 @@ export async function authorizeUser({ name, email, role }) {
   });
   return parseJsonResponse(response);
 }
+
+export async function revokeUser(userId) {
+  const response = await fetch(`${API_BASE_URL}/auth/users/${userId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 204) return;
+  return parseJsonResponse(response);
+}
