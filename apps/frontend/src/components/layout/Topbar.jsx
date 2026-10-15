@@ -1,7 +1,25 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Bell, Menu, Search, Shield, X } from "lucide-react";
+import { fetchAlerts } from "../../services/dashboardApi.js";
 
-export function Topbar({ isMobileMenuOpen, onToggleMobileMenu }) {
+export function Topbar({ isMobileMenuOpen, onToggleMobileMenu, onOpenNotifications }) {
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadNotifications = async () => {
+      try {
+        const alerts = await fetchAlerts();
+        if (mounted) setNotificationCount(Array.isArray(alerts) ? alerts.length : alerts.items?.length ?? 0);
+      } catch {
+        if (mounted) setNotificationCount(0);
+      }
+    };
+    loadNotifications();
+    const timer = setInterval(loadNotifications, 15_000);
+    return () => { mounted = false; clearInterval(timer); };
+  }, []);
+
   return (
     <header className="dashboard-topbar">
       <button
@@ -33,9 +51,9 @@ export function Topbar({ isMobileMenuOpen, onToggleMobileMenu }) {
           Conectado
         </div>
 
-        <button type="button" className="dashboard-icon-btn" aria-label="Notificaciones">
+        <button type="button" className="dashboard-icon-btn" aria-label={`Notificaciones${notificationCount ? `: ${notificationCount} activas` : ""}`} onClick={onOpenNotifications}>
           <Bell size={18} />
-          <span className="dashboard-icon-btn__badge">3</span>
+          {notificationCount > 0 && <span className="dashboard-icon-btn__badge">{notificationCount > 99 ? "99+" : notificationCount}</span>}
         </button>
       </div>
     </header>
