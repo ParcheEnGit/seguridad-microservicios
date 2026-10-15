@@ -185,7 +185,9 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
-    networks: [backend]
+    # Mantiene acceso a PostgreSQL por la red privada y habilita solamente este
+    # servicio para entregar alertas SMTP al proveedor configurado.
+    networks: [backend, outbound]
     restart: unless-stopped
 
   alert-ticket-service:
@@ -235,6 +237,7 @@ networks:
   frontend:
   backend:
     internal: true
+  outbound:
 
 volumes:
   postgres_data:
