@@ -42,6 +42,10 @@ class UserRepository:
     def list_users(self) -> list[User]:
         return list(self.db.scalars(select(User).order_by(User.role, User.name, User.email)))
 
+    def has_users(self) -> bool:
+        """Indica si la lista de autorización ya fue inicializada."""
+        return self.db.scalar(select(User.id).limit(1)) is not None
+
     def invite(self, *, name: str, email: str, role: int) -> User:
         return self.create(
             google_id=None,
@@ -92,7 +96,6 @@ class UserRepository:
         picture_url: str | None,
         admin_emails: set[str],
     ) -> User:
-        del admin_emails  # La autorización es explícita desde la administración de usuarios.
         existing = self.get_by_google_id(google_id)
         if existing:
             return self._sync_profile(existing, name=name, picture_url=picture_url)
@@ -103,6 +106,18 @@ class UserRepository:
             return self.link_google_identity(
                 invited,
                 google_id=google_id,
+                picture_url=picture_url,
+            )
+
+        # Solo se permite un administrador de arranque en una base vacía. A partir
+        # de ese momento, toda cuenta debe ser autorizada explícitamente desde el
+        # Dashboard Admin; ADMIN_EMAILS no funciona como registro abierto.
+        if not self.has_users() and email.strip().lower() in admin_emails:
+            return self.create(
+                google_id=google_id,
+                email=email.strip().lower(),
+                name=name,
+                role=0,
                 picture_url=picture_url,
             )
 
