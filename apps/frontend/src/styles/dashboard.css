@@ -2856,6 +2856,9 @@
 .users-role, .users-google { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-size: .76rem; font-weight: 750; white-space: nowrap; }
 .users-role--admin { background: #e9f0ff; color: #245aac; }
 .users-role--reader { background: #eef6f1; color: #227147; }
+.users-role-select select { min-width: 132px; border: 1px solid #d6e5dc; border-radius: 999px; padding: 6px 28px 6px 10px; background: #f7fbf8; color: #17613f; font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.users-role-select select:focus-visible { outline: 2px solid #74b38d; outline-offset: 2px; }
+.users-role-select select:disabled { cursor: wait; opacity: .6; }
 .users-google { background: #f1f3f2; color: #708078; }
 .users-google--linked { background: #eef8f2; color: #168044; }
 .users-remove-btn { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 8px; padding: 7px 9px; background: #fff0ef; color: #ba2b23; font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
