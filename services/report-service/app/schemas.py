@@ -46,6 +46,8 @@ class ChartPoint(BaseModel):
     hour: datetime
     temperatura: float | None
     humedad: float | None
+    temperatura_out_of_range: bool = False
+    humedad_out_of_range: bool = False
 
 
 class AdminSummary(BaseModel):
@@ -69,6 +71,8 @@ class DeviceTelemetryPoint(BaseModel):
     device_id: UUID
     metric_code: str
     value: float
+    out_of_range: bool = False
+    simulated_peak: bool = False
 
 
 class DeviceTelemetrySeries(BaseModel):
