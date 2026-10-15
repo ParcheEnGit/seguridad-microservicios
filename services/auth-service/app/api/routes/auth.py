@@ -128,6 +128,30 @@ def create_authorized_user(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese correo ya está autorizado") from exc
 
 
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Revocar el acceso de un usuario")
+def delete_authorized_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+) -> Response:
+    repository = UserRepository(db)
+    target = repository.get_by_id(user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    if target.id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No puedes revocar tu propio acceso mientras tienes una sesión activa",
+        )
+    if target.role == 0 and repository.count_administrators() <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Debe permanecer al menos un administrador autorizado",
+        )
+    repository.delete(target)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/logout")
 def logout(
     response: Response,
