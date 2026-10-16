@@ -25,7 +25,11 @@ export function LineChart24h({ points }) {
   const lines = SERIES.map((serie) => {
     const values = points
       .filter((point) => point[serie.key] !== null && point[serie.key] !== undefined)
-      .map((point) => ({ time: new Date(point.hour).getTime(), value: Number(point[serie.key]) }));
+      .map((point) => ({
+        time: new Date(point.hour).getTime(),
+        value: Number(point[serie.key]),
+        outOfRange: Boolean(point[`${serie.key}_out_of_range`]),
+      }));
     if (!values.length) return { ...serie, values: [], min: null, max: null };
     const min = Math.min(...values.map((value) => value.value));
     const max = Math.max(...values.map((value) => value.value));
@@ -62,12 +66,16 @@ export function LineChart24h({ points }) {
         {lines.map((line) => line.values.length > 0 && (
           <g key={line.key}>
             <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            {line.values.slice(1).map((value, index) => {
+              const previous = line.values[index];
+              return value.outOfRange && <line key={`alert-${value.time}`} x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" />;
+            })}
             <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} />
-            {line.values.map((value) => <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 3.5} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
+            {line.values.map((value) => <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : value.outOfRange ? 4.8 : 3.5} className="admin-chart__point" fill={value.outOfRange ? "#d93025" : line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
           </g>
         ))}
       </svg>
-      {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.label}: {hovered.value.toFixed(1)} {hovered.unit}</strong><span>{formatDateTime(new Date(hovered.time))}</span></div>}
+      {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.label}: {hovered.value.toFixed(1)} {hovered.unit}</strong><span>{formatDateTime(new Date(hovered.time))}{hovered.outOfRange ? " · Fuera de umbral" : ""}</span></div>}
       <div className="admin-chart-summary" aria-label="Resumen de rangos">
         {lines.filter((line) => line.values.length).map((line) => <span key={line.key}><i style={{ background: line.color }} />{line.label}: {line.min.toFixed(1)}–{line.max.toFixed(1)} {line.unit}</span>)}
       </div>

@@ -61,6 +61,18 @@ def test_rol_desconocido_responde_403():
     assert client_with_token(unknown).post("/tickets", data=VALID_FORM).status_code == 403
 
 
+def test_lector_no_puede_consultar_la_gestion_global():
+    assert lector().get("/tickets").status_code == 403
+
+
+def test_lector_no_puede_actualizar_el_estado_de_un_ticket():
+    response = lector().patch(
+        f"/tickets/{uuid.uuid4()}/status",
+        json={"status": "en_revision"},
+    )
+    assert response.status_code == 403
+
+
 @pytest.mark.parametrize("field", ["device_id", "category", "description"])
 def test_campos_obligatorios_responden_422(field):
     form = {key: value for key, value in VALID_FORM.items() if key != field}

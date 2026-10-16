@@ -59,9 +59,15 @@ RECENT_ALERTS_SQL = text("""
 CHART_24H_SQL = text("""
     SELECT date_bin(INTERVAL '5 minutes', r.recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
            AVG(r.value) FILTER (WHERE r.metric_code = 'temperatura')::float       AS temperatura,
-           AVG(r.value) FILTER (WHERE r.metric_code = 'humedad')::float           AS humedad
+           AVG(r.value) FILTER (WHERE r.metric_code = 'humedad')::float           AS humedad,
+           COALESCE(BOOL_OR(r.value < t.min_value OR r.value > t.max_value)
+               FILTER (WHERE r.metric_code = 'temperatura'), FALSE)               AS temperatura_out_of_range,
+           COALESCE(BOOL_OR(r.value < t.min_value OR r.value > t.max_value)
+               FILTER (WHERE r.metric_code = 'humedad'), FALSE)                   AS humedad_out_of_range
     FROM telemetry_service.readings r
     JOIN device_service.devices d ON d.id = r.device_id
+    LEFT JOIN device_service.thresholds t
+        ON t.device_id = r.device_id AND t.metric_code = r.metric_code
     WHERE r.recorded_at >= NOW() - INTERVAL '24 hours'
       AND r.metric_code IN ('temperatura', 'humedad')
       AND concat_ws(' ', d.name, d.device_code, d.device_type) ILIKE '%ambient%'
@@ -88,9 +94,13 @@ SERIES_DEVICES_SQL = text("""
 
 DEVICE_SERIES_SQL = text("""
     SELECT date_bin(CAST(:bucket AS interval), r.recorded_at, TIMESTAMPTZ '2000-01-01') AS bucket,
-           r.device_id, r.metric_code, AVG(r.value)::float AS value
+           r.device_id, r.metric_code, AVG(r.value)::float AS value,
+           COALESCE(BOOL_OR(r.value < t.min_value OR r.value > t.max_value), FALSE) AS out_of_range,
+           COALESCE(BOOL_OR((r.payload ->> 'simulation_event') IN ('pico_forzado', 'pico_aleatorio')), FALSE) AS simulated_peak
     FROM telemetry_service.readings r
     JOIN device_service.devices d ON d.id = r.device_id AND d.status = 'activo'
+    LEFT JOIN device_service.thresholds t
+        ON t.device_id = r.device_id AND t.metric_code = r.metric_code
     WHERE r.recorded_at >= NOW() - CAST(:period AS interval)
       AND r.metric_code IN ('temperatura', 'humedad')
     GROUP BY 1, r.device_id, r.metric_code
@@ -129,7 +139,7 @@ def device_telemetry(
     period: str = Query(default="24h"),
     resolution: str = Query(default="5m"),
     db: Session = Depends(get_db),
-    _: dict = Depends(require_admin),
+    _: dict = Depends(get_current_claims),
 ) -> DeviceTelemetrySeries:
     if period not in SERIES_OPTIONS or resolution not in RESOLUTION_OPTIONS:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Periodo o resolución no permitidos")

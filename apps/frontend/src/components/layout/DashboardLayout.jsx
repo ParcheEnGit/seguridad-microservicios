@@ -39,6 +39,7 @@ export function DashboardLayout({
         <Topbar
           isMobileMenuOpen={mobileMenuOpen}
           onToggleMobileMenu={() => setMobileMenuOpen((current) => !current)}
+          onOpenNotifications={() => navigate("alertas")}
         />
         <main className="dashboard-content">{children}</main>
       </div>

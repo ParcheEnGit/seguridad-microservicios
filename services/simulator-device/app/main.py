@@ -12,6 +12,15 @@ TELEMETRY_URL = os.getenv("TELEMETRY_URL", "http://telemetry-service:8000")
 SIMULATOR_KEY = os.environ["SIMULATOR_API_KEY"]
 INTERVAL_SECONDS = max(5, int(os.getenv("SIMULATOR_INTERVAL_SECONDS", "15")))
 SIMULATOR_ENABLED = os.getenv("SIMULATOR_ENABLED", "true").lower() == "true"
+RARE_PEAK_PROBABILITY = min(0.05, max(0.0, float(os.getenv("SIMULATOR_RARE_PEAK_PROBABILITY", "0.00005"))))
+
+# Perfil SNMP v2c emulado: conserva OID y versión en cada lectura para que la
+# integración con agentes físicos pueda sustituir al simulador sin cambiar el
+# contrato de telemetría.
+SNMP_OIDS = {
+    "temperatura": "1.3.6.1.4.1.53864.1.1.1.0",
+    "humedad": "1.3.6.1.4.1.53864.1.1.2.0",
+}
 
 
 def request_json(path: str, method: str = "GET", payload: dict | None = None) -> dict | list:
@@ -38,6 +47,32 @@ def simulated_value(metric: dict) -> float:
     return round(random.uniform(lower, upper), 2)
 
 
+def rare_peak_value(metric: dict) -> tuple[float, str] | None:
+    """Genera anomalías críticas excepcionales solo donde existe un umbral."""
+    if not metric.get("has_threshold") or random.random() >= RARE_PEAK_PROBABILITY:
+        return None
+    minimum = float(metric["min_value"])
+    maximum = float(metric["max_value"])
+    margin = max((maximum - minimum) * random.uniform(0.25, 0.55), 0.5)
+    return (
+        round(maximum + margin, 2) if random.choice((True, False)) else round(minimum - margin, 2),
+        "pico_aleatorio",
+    )
+
+
+def snmp_payload(metric: dict, event: str, peak: dict | None = None) -> dict:
+    return {
+        "protocol": "SNMP",
+        "snmp_version": "v2c",
+        "oid": SNMP_OIDS.get(metric["metric_code"], "1.3.6.1.4.1.53864.1.1.255.0"),
+        "transport": "simulado",
+        "simulation_event": event,
+        "simulation_peak_first_reading": bool(
+            peak and peak["cycles_remaining"] == peak.get("cycles_total", peak["cycles_remaining"])
+        ),
+    }
+
+
 def send_cycle() -> tuple[int, dict[str, list[str]], int]:
     targets = request_json("/simulation-targets")
     pending_peaks = request_json("/simulation/peaks")
@@ -58,10 +93,13 @@ def send_cycle() -> tuple[int, dict[str, list[str]], int]:
                 now = datetime.now(timezone.utc)
                 timestamps = [now - timedelta(hours=hour) for hour in range(7 * 24, 0, -6)] + [now]
             for timestamp in timestamps:
-                is_peak_reading = peak is not None and timestamp == timestamps[-1]
-                value = peak["value"] if is_peak_reading else simulated_value(metric)
+                is_current_reading = timestamp == timestamps[-1]
+                is_peak_reading = peak is not None and is_current_reading
+                random_peak = rare_peak_value(metric) if is_current_reading and not is_peak_reading else None
+                event = "pico_forzado" if is_peak_reading else (random_peak[1] if random_peak else "normal")
+                value = peak["value"] if is_peak_reading else (random_peak[0] if random_peak else simulated_value(metric))
                 try:
-                    request_json(
+                    result = request_json(
                         "/readings",
                         method="POST",
                         payload={
@@ -71,13 +109,15 @@ def send_cycle() -> tuple[int, dict[str, list[str]], int]:
                             "value": value,
                             "equipment_status": "operativo",
                             "recorded_at": timestamp.isoformat(),
+                            "payload": snmp_payload(metric, event, peak if is_peak_reading else None),
                         },
                     )
                     sent += 1
-                    if timestamp == timestamps[-1]:
-                        kind = "PICO" if is_peak_reading else "normal"
+                    if is_current_reading:
+                        kind = "PICO FORZADO" if is_peak_reading else ("PICO ALEATORIO" if random_peak else "normal")
+                        alert = " · ALERTA" if result.get("out_of_range") else ""
                         current_readings.setdefault(target["device_code"], []).append(
-                            f"{metric['metric_code']}={value} {metric['unit']} ({kind})"
+                            f"SNMP {metric['metric_code']}={value} {metric['unit']} ({kind}{alert})"
                         )
                     else:
                         history_readings += 1
@@ -91,7 +131,7 @@ def send_cycle() -> tuple[int, dict[str, list[str]], int]:
 def main() -> None:
     state = "activo" if SIMULATOR_ENABLED else "desactivado"
     print(
-        f"LabSentinel | Simulador {state} | Intervalo: {INTERVAL_SECONDS} s",
+        f"LabSentinel | Simulador SNMP v2c {state} | Intervalo: {INTERVAL_SECONDS} s | Pico aleatorio: {RARE_PEAK_PROBABILITY:.4%}",
         flush=True,
     )
     while True:

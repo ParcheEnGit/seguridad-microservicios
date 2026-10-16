@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Mail, Shield } from "lucide-react";
+import { Mail } from "lucide-react";
+import logoUrl from "../assets/labsentinel-mark.svg";
 import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
 import { loginWithPassword } from "../services/authApi.js";
 
@@ -42,7 +43,7 @@ export function LoginPage({ onLoginSuccess }) {
       <section className="auth-card" aria-labelledby="login-title">
         <div className="auth-brand" aria-hidden="true">
           <div className="auth-brand-icon">
-            <Shield size={22} strokeWidth={2.2} />
+            <img src={logoUrl} alt="" />
           </div>
         </div>
 

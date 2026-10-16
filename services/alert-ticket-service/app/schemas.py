@@ -34,6 +34,11 @@ class TicketStatusChange(BaseModel):
     changed_at: datetime
 
 
+class TicketStatusUpdate(BaseModel):
+    status: TicketStatus
+    note: str | None = Field(default=None, max_length=500)
+
+
 class TicketResponse(BaseModel):
     id: uuid.UUID
     code: str

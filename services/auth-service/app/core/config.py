@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     cookie_name: str = "labsentinel_session"
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
+    # Solo permite inicializar el primer administrador si public.users está vacía.
+    # No concede acceso automático cuando ya existen usuarios autorizados.
     admin_emails: str = ""
     local_password_login_enabled: bool = False
 
