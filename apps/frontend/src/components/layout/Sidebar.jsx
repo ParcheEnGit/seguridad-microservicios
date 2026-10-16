@@ -1,5 +1,6 @@
 import React from "react";
-import { Shield, X } from "lucide-react";
+import { X } from "lucide-react";
+import logoUrl from "../../assets/labsentinel-mark.svg";
 import { getNavItemsForRole } from "../../constants/navigation.js";
 import { UserAvatar } from "../common/UserAvatar.jsx";
 import { getRoleLabelForDisplay } from "../../utils/userDisplay.js";
@@ -11,7 +12,7 @@ export function Sidebar({ user, activeItem, onNavigate, onLogout, isMobileOpen, 
     <aside className={`dashboard-sidebar${isMobileOpen ? " dashboard-sidebar--mobile-open" : ""}`} aria-label="Navegación principal">
       <div className="dashboard-sidebar__brand">
         <div className="dashboard-sidebar__logo" aria-hidden="true">
-          <Shield size={18} strokeWidth={2.2} />
+          <img src={logoUrl} alt="" />
         </div>
         <span>LabSentinel</span>
         <button type="button" className="dashboard-sidebar__close" onClick={onCloseMobileMenu} aria-label="Cerrar menú">
