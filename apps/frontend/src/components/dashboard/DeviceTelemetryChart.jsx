@@ -101,7 +101,7 @@ export function DeviceTelemetryChart() {
       <header className="admin-card-header">
         <div>
           <h2 className="dashboard-card__title">Lecturas por dispositivo</h2>
-          <p className="device-telemetry-card__subtitle">Selecciona la métrica, el periodo y la resolución de visualización.</p>
+          <p className="device-telemetry-card__subtitle">Selecciona la métrica, el periodo y el intervalo de muestreo.</p>
         </div>
         <button type="button" className="device-telemetry-card__expand" onClick={() => setExpanded((current) => !current)}>
           {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -111,7 +111,7 @@ export function DeviceTelemetryChart() {
 
       <div className="telemetry-controls">
         <div><span>Periodo</span>{PERIODS.map(([value, label]) => <button key={value} type="button" className={period === value ? "is-active" : ""} onClick={() => setPeriod(value)}>{label}</button>)}</div>
-        <div><span>Resolución</span>{RESOLUTIONS.map(([value, label]) => <button key={value} type="button" className={resolution === value ? "is-active" : ""} onClick={() => setResolution(value)}>{label}</button>)}</div>
+        <div><span>Intervalo de muestreo</span>{RESOLUTIONS.map(([value, label]) => <button key={value} type="button" className={resolution === value ? "is-active" : ""} onClick={() => setResolution(value)}>{label}</button>)}</div>
         <div><span>Métrica</span>{Object.entries(METRICS).map(([value, label]) => <button key={value} type="button" className={metric === value ? "is-active" : ""} onClick={() => setMetric(value)}>{label}</button>)}</div>
       </div>
 
@@ -130,7 +130,7 @@ export function DeviceTelemetryChart() {
         </div>
       )}
 
-      {denseView && <p className="telemetry-density-note">Vista de alta densidad: oculta dispositivos o usa una resolución de 5 min o mayor para mejorar la lectura.</p>}
+      {denseView && <p className="telemetry-density-note">Vista de alta densidad: oculta dispositivos o usa un intervalo de muestreo de 5 min o mayor para mejorar la lectura.</p>}
       {!data && !error && <p className="device-muted"><LoaderCircle size={16} className="telemetry-loading" /> Cargando lecturas por dispositivo...</p>}
       {error && <p className="device-form-error">{error}</p>}
 
