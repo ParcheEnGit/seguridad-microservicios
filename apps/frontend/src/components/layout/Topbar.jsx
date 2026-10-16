@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Bell, Menu, Search, Shield, X } from "lucide-react";
+import { Bell, Menu, Search, X } from "lucide-react";
+import logoUrl from "../../assets/labsentinel-mark.svg";
 import { fetchAlerts } from "../../services/dashboardApi.js";
 
 export function Topbar({ isMobileMenuOpen, onToggleMobileMenu, onOpenNotifications }) {
@@ -32,7 +33,7 @@ export function Topbar({ isMobileMenuOpen, onToggleMobileMenu, onOpenNotificatio
         {isMobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
       </button>
       <div className="dashboard-mobile-brand" aria-hidden="true">
-        <Shield size={17} />
+        <img src={logoUrl} alt="" />
         <strong>LabSentinel</strong>
       </div>
       <label className="dashboard-search" htmlFor="dashboard-search-input">
