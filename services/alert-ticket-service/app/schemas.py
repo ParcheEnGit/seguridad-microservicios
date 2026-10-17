@@ -32,6 +32,20 @@ class TicketStatusChange(BaseModel):
     new_status: TicketStatus
     note: str | None
     changed_at: datetime
+    changed_by_user_id: int | None = None
+    changed_by_name: str | None = None
+
+
+class TicketComment(BaseModel):
+    id: uuid.UUID
+    author_user_id: int
+    author_name: str | None = None
+    comment: str
+    created_at: datetime
+
+
+class TicketCommentCreate(BaseModel):
+    comment: str = Field(min_length=1, max_length=1000)
 
 
 class TicketStatusUpdate(BaseModel):
@@ -56,6 +70,7 @@ class TicketResponse(BaseModel):
 
 class TicketDetailResponse(TicketResponse):
     history: list[TicketStatusChange] = []
+    comments: list[TicketComment] = []
 
 
 class TicketListResponse(BaseModel):
