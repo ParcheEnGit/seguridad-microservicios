@@ -88,6 +88,30 @@
   font-size: .88rem;
 }
 
+.ticket-filter-bar--admin {
+  grid-template-columns: minmax(190px, 1.45fr) minmax(145px, .8fr) minmax(170px, 1fr) minmax(132px, .7fr) minmax(132px, .7fr);
+}
+
+.ticket-date-filter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: #6b7a73;
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.ticket-date-filter input {
+  min-width: 0;
+  border: 1px solid #d4e1d9;
+  border-radius: 10px;
+  padding: 9px 8px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+}
+
 .ticket-error {
   display: flex;
   align-items: center;
@@ -434,6 +458,60 @@
   white-space: pre-wrap;
 }
 
+.ticket-history__author {
+  display: block;
+  margin-top: 7px;
+  color: #6b7a73;
+  font-size: .78rem;
+}
+
+.ticket-comments {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ticket-comments li {
+  padding: 11px 12px;
+  border: 1px solid #edf2ef;
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+
+.ticket-comments li > div,
+.ticket-comment-form > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ticket-comments strong { color: #31483e; font-size: .86rem; }
+.ticket-comments small { margin-left: auto; color: #809087; font-size: .76rem; }
+.ticket-comments p { margin: 8px 0 0; color: #3d4d45; line-height: 1.45; white-space: pre-wrap; }
+
+.ticket-comment-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ticket-comment-form label { color: #31483e; font-size: .84rem; font-weight: 700; }
+.ticket-comment-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #d4e1d9;
+  border-radius: 10px;
+  padding: 10px 11px;
+  color: #1f2937;
+  font: inherit;
+}
+.ticket-comment-form > div { justify-content: space-between; }
+.ticket-comment-form small { color: #809087; font-size: .76rem; }
+.ticket-comment-form .ticket-outline-btn { padding: 8px 11px; font-size: .82rem; }
+
 /* Móvil */
 @media (max-width: 860px) {
   .ticket-create-layout {
@@ -471,6 +549,10 @@
   .ticket-filter-bar {
     grid-template-columns: 1fr;
   }
+
+  .ticket-filter-bar--admin { grid-template-columns: 1fr; }
+
+  .ticket-date-filter { grid-template-columns: 42px minmax(0, 1fr); }
 
   .ticket-table-card {
     padding: 0;

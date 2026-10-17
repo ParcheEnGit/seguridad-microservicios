@@ -36,6 +36,9 @@ class FakeResult:
     def first(self):
         return self.row
 
+    def one_or_none(self):
+        return self.row
+
     def all(self):
         return self.rows
 
@@ -50,6 +53,8 @@ class FakeDatabase:
         self.ticket_owner_id = ticket_owner_id
         self.ticket_insert = None
         self.history_insert = None
+        self.status_update = None
+        self.comment_insert = None
         self.list_sql = None
         self.list_params = None
         self.committed = False
@@ -60,6 +65,7 @@ class FakeDatabase:
             "note": "Ticket registrado",
             "changed_at": now,
         }]
+        self.comments = []
         self.ticket_row = {
             "id": self.ticket_id,
             "ticket_number": 1,
@@ -80,6 +86,10 @@ class FakeDatabase:
 
     def execute(self, statement, params=None):
         sql = str(statement)
+        if "SELECT status FROM alert_ticket_service.tickets" in sql:
+            return FakeResult(row={"status": self.ticket_row["status"]})
+        if "SELECT id FROM alert_ticket_service.tickets" in sql:
+            return FakeResult(row={"id": self.ticket_id})
         if "SELECT id FROM device_service.devices" in sql:
             return FakeResult(row={"id": DEVICE_ID} if self.device_exists else None)
         if "INSERT INTO alert_ticket_service.tickets" in sql:
@@ -88,9 +98,34 @@ class FakeDatabase:
             return FakeResult(scalar=self.ticket_id)
         if "INSERT INTO alert_ticket_service.ticket_status_history" in sql:
             self.history_insert = {"sql": sql, **params}
+            if params.get("previous_status") is not None:
+                self.history.append({
+                    "previous_status": params["previous_status"],
+                    "new_status": params["new_status"],
+                    "note": params["note"],
+                    "changed_at": self.ticket_row["updated_at"],
+                    "changed_by_user_id": params["user_id"],
+                    "changed_by_name": "Administrador de pruebas",
+                })
+            return FakeResult()
+        if "UPDATE alert_ticket_service.tickets" in sql:
+            self.status_update = params
+            self.ticket_row["status"] = params["status"]
+            return FakeResult()
+        if "INSERT INTO alert_ticket_service.ticket_comments" in sql:
+            self.comment_insert = params
+            self.comments.append({
+                "id": uuid.uuid4(),
+                "author_user_id": params["user_id"],
+                "author_name": "Administrador de pruebas",
+                "comment": params["comment"],
+                "created_at": self.ticket_row["updated_at"],
+            })
             return FakeResult()
         if "FROM alert_ticket_service.ticket_status_history" in sql:
             return FakeResult(rows=self.history)
+        if "FROM alert_ticket_service.ticket_comments" in sql:
+            return FakeResult(rows=self.comments)
         if "SELECT COUNT(*)" in sql:
             return FakeResult(scalar=1)
         if "WHERE t.id = :ticket_id" in sql:
@@ -181,3 +216,67 @@ def test_admin_puede_ver_ticket_de_cualquier_lector():
     response = client_for(db, ADMIN_ID, role=0).get(f"/tickets/{db.ticket_id}")
 
     assert response.status_code == 200
+
+
+def test_admin_solo_puede_avanzar_la_transicion_permitida_y_queda_trazabilidad():
+    db = FakeDatabase(ticket_owner_id=OTHER_READER_ID)
+
+    response = client_for(db, ADMIN_ID, role=0).patch(
+        f"/tickets/{db.ticket_id}/status",
+        json={"status": "en_revision", "note": "Se inició la revisión física."},
+    )
+
+    assert response.status_code == 200
+    assert db.status_update["status"] == "en_revision"
+    assert db.history_insert["previous_status"] == "abierto"
+    assert db.history_insert["new_status"] == "en_revision"
+    assert db.history_insert["user_id"] == ADMIN_ID
+    assert response.json()["history"][-1]["note"] == "Se inició la revisión física."
+
+
+def test_admin_no_puede_saltar_transiciones_de_estado():
+    db = FakeDatabase(ticket_owner_id=OTHER_READER_ID)
+
+    response = client_for(db, ADMIN_ID, role=0).patch(
+        f"/tickets/{db.ticket_id}/status",
+        json={"status": "cerrado"},
+    )
+
+    assert response.status_code == 409
+    assert db.status_update is None
+
+
+def test_admin_agrega_comentario_trazable_al_ticket():
+    db = FakeDatabase(ticket_owner_id=OTHER_READER_ID)
+
+    response = client_for(db, ADMIN_ID, role=0).post(
+        f"/tickets/{db.ticket_id}/comments",
+        json={"comment": "Se coordinará una inspección presencial mañana."},
+    )
+
+    assert response.status_code == 200
+    assert db.comment_insert["user_id"] == ADMIN_ID
+    assert response.json()["comments"][0]["comment"] == "Se coordinará una inspección presencial mañana."
+
+
+def test_bandeja_admin_aplica_filtros_de_estado_dispositivo_y_fecha():
+    db = FakeDatabase(ticket_owner_id=OTHER_READER_ID)
+
+    response = client_for(db, ADMIN_ID, role=0).get(
+        f"/tickets?status=abierto&device_id={DEVICE_ID}&date_from=2026-10-01&date_to=2026-10-09",
+    )
+
+    assert response.status_code == 200
+    assert "t.status = :status" in db.list_sql
+    assert "t.device_id = :device_id" in db.list_sql
+    assert "t.created_at >= :date_from" in db.list_sql
+    assert "t.created_at < :date_to_exclusive" in db.list_sql
+    assert db.list_params["device_id"] == DEVICE_ID
+
+
+def test_bandeja_admin_rechaza_rango_de_fechas_invertido():
+    db = FakeDatabase(ticket_owner_id=OTHER_READER_ID)
+
+    response = client_for(db, ADMIN_ID, role=0).get("/tickets?date_from=2026-10-10&date_to=2026-10-01")
+
+    assert response.status_code == 422

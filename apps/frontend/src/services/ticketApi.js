@@ -40,6 +40,14 @@ export function updateTicketStatus(id, status, note = "") {
   });
 }
 
+export function createTicketComment(id, comment) {
+  return request(`/tickets/${id}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comment }),
+  });
+}
+
 export function createTicket({ deviceId, category, description, attachment }) {
   const formData = new FormData();
   formData.append("device_id", deviceId);
