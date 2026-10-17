@@ -18,6 +18,19 @@ import { createTicket, createTicketComment, getTicket, listMyTickets, listTicket
 const REDIRECT_DELAY_MS = 3000;
 const EMPTY_FORM = { deviceId: "", category: "", description: "" };
 
+function getBoliviaToday() {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+const TODAY = getBoliviaToday();
+
 function formatDate(timestamp, withTime = false) {
   return new Intl.DateTimeFormat("es-BO", {
     day: "numeric",
@@ -410,8 +423,8 @@ function TicketList({ onCreate, onView, admin, refreshKey }) {
             <option value="">Todos los dispositivos</option>
             {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
           </select>
-          <label className="ticket-date-filter"><span>Desde</span><input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} /></label>
-          <label className="ticket-date-filter"><span>Hasta</span><input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} /></label>
+          <label className="ticket-date-filter"><span>Desde</span><input type="date" value={dateFrom} max={dateTo || TODAY} onChange={(event) => setDateFrom(event.target.value > TODAY ? TODAY : event.target.value)} /></label>
+          <label className="ticket-date-filter"><span>Hasta</span><input type="date" value={dateTo} min={dateFrom || undefined} max={TODAY} onChange={(event) => setDateTo(event.target.value > TODAY ? TODAY : event.target.value)} /></label>
         </>}
       </section>
 
