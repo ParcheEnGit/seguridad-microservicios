@@ -159,3 +159,50 @@ class AlertReportResponse(BaseModel):
     timeline: list[AlertReportTimelinePoint]
     alerts: list[AlertReportDetail]
     generated_at: datetime
+
+
+# HU11: Esquemas del reporte administrativo de tickets.
+
+class TicketReportSummary(BaseModel):
+    total: int
+    abiertos: int
+    en_revision: int
+    resueltos: int
+    cerrados: int
+
+
+class TicketReportDetail(BaseModel):
+    id: UUID
+    ticket_number: int | None = None
+    device_id: UUID
+    device_code: str | None = None
+    device_name: str | None = None
+    category: str
+    description: str
+    status: str
+    created_by_user_id: int
+    assigned_to_user_id: int | None = None
+    resolved_by_user_id: int | None = None
+    resolved_at: datetime | None = None
+    closed_by_user_id: int | None = None
+    closed_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+    abiertos: int
+    en_revision: int
+    resueltos: int
+    cerrados: int
+
+
+class TicketReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: TicketReportSummary
+    timeline: list[TicketReportTimelinePoint]
+    tickets: list[TicketReportDetail]
+    generated_at: datetime

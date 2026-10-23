@@ -23,9 +23,17 @@ from app.report_queries import (
     ALERT_REPORT_SUMMARY_SQL,
     ALERT_REPORT_DETAILS_SQL,
     ALERT_REPORT_TIMELINE_SQL,
+    TICKET_REPORT_SUMMARY_SQL,
+    TICKET_REPORT_DETAILS_SQL,
+    TICKET_REPORT_TIMELINE_SQL,
 )
 
-from app.schemas import DeviceReportResponse, AlertReportResponse
+from app.schemas import (
+    DeviceReportResponse,
+    AlertReportResponse,
+    TicketReportResponse,
+)
+
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -304,6 +312,97 @@ def alerts_report(
         end_date=end_date,
         summary=summary,
         alerts=alerts,
+        timeline=timeline,
+        generated_at=datetime.now(timezone.utc),
+    )
+
+
+
+# HU11: Reporte administrativo de tickets.
+@router.get(
+    "/reports/tickets",
+    response_model=TicketReportResponse,
+    summary="Generar reporte de tickets por período",
+)
+def tickets_report(
+    start_date: date = Query(..., description="Fecha inicial (AAAA-MM-DD)"),
+    end_date: date = Query(..., description="Fecha final (AAAA-MM-DD)"),
+    device_id: UUID | None = Query(default=None),
+    ticket_status: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> TicketReportResponse:
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
+    if ticket_status not in (
+        None,
+        "abierto",
+        "en_revision",
+        "resuelto",
+        "cerrado",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El estado del ticket no es válido",
+        )
+
+    if category not in (
+        None,
+        "carcasa_rota",
+        "tapa_faltante",
+        "etiqueta_ilegible",
+        "deterioro_estetico",
+        "otro",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La categoría del ticket no es válida",
+        )
+
+    start_datetime = datetime.combine(
+        start_date,
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    end_datetime = datetime.combine(
+        end_date + timedelta(days=1),
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    params = {
+        "start_date": start_datetime,
+        "end_date": end_datetime,
+        "device_id": str(device_id) if device_id else None,
+        "ticket_status": ticket_status,
+        "category": category,
+    }
+
+    summary = dict(
+        db.execute(TICKET_REPORT_SUMMARY_SQL, params).mappings().one()
+    )
+
+    tickets = [
+        dict(row)
+        for row in db.execute(TICKET_REPORT_DETAILS_SQL, params).mappings()
+    ]
+
+    timeline = [
+        dict(row)
+        for row in db.execute(TICKET_REPORT_TIMELINE_SQL, params).mappings()
+    ]
+
+    return TicketReportResponse(
+        start_date=start_date,
+        end_date=end_date,
+        summary=summary,
+        tickets=tickets,
         timeline=timeline,
         generated_at=datetime.now(timezone.utc),
     )

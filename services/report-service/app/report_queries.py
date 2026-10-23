@@ -114,3 +114,70 @@ ALERT_REPORT_TIMELINE_SQL = text("""
     GROUP BY 1
     ORDER BY 1
 """)
+
+
+# HU11: Consultas de solo lectura para el reporte administrativo de tickets.
+
+TICKET_REPORT_SUMMARY_SQL = text("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'abierto') AS abiertos,
+        COUNT(*) FILTER (WHERE status = 'en_revision') AS en_revision,
+        COUNT(*) FILTER (WHERE status = 'resuelto') AS resueltos,
+        COUNT(*) FILTER (WHERE status = 'cerrado') AS cerrados
+    FROM alert_ticket_service.tickets
+    WHERE created_at >= :start_date
+      AND created_at < :end_date
+      AND (:device_id IS NULL OR device_id = CAST(:device_id AS uuid))
+      AND (:ticket_status IS NULL OR status = :ticket_status)
+      AND (:category IS NULL OR category = :category)
+""")
+
+
+TICKET_REPORT_DETAILS_SQL = text("""
+    SELECT
+        t.id,
+        t.ticket_number,
+        t.device_id,
+        d.device_code,
+        d.name AS device_name,
+        t.category,
+        t.description,
+        t.status,
+        t.created_by_user_id,
+        t.assigned_to_user_id,
+        t.resolved_by_user_id,
+        t.resolved_at,
+        t.closed_by_user_id,
+        t.closed_at,
+        t.created_at,
+        t.updated_at
+    FROM alert_ticket_service.tickets AS t
+    LEFT JOIN device_service.devices AS d
+        ON d.id = t.device_id
+    WHERE t.created_at >= :start_date
+      AND t.created_at < :end_date
+      AND (:device_id IS NULL OR t.device_id = CAST(:device_id AS uuid))
+      AND (:ticket_status IS NULL OR t.status = :ticket_status)
+      AND (:category IS NULL OR t.category = :category)
+    ORDER BY t.created_at DESC, t.id
+""")
+
+
+TICKET_REPORT_TIMELINE_SQL = text("""
+    SELECT
+        DATE(created_at AT TIME ZONE 'UTC') AS day,
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'abierto') AS abiertos,
+        COUNT(*) FILTER (WHERE status = 'en_revision') AS en_revision,
+        COUNT(*) FILTER (WHERE status = 'resuelto') AS resueltos,
+        COUNT(*) FILTER (WHERE status = 'cerrado') AS cerrados
+    FROM alert_ticket_service.tickets
+    WHERE created_at >= :start_date
+      AND created_at < :end_date
+      AND (:device_id IS NULL OR device_id = CAST(:device_id AS uuid))
+      AND (:ticket_status IS NULL OR status = :ticket_status)
+      AND (:category IS NULL OR category = :category)
+    GROUP BY 1
+    ORDER BY 1
+""")
