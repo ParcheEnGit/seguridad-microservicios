@@ -1,15 +1,28 @@
 # Plan de pruebas experimentales
 
-Los resultados se completarán después de implementar. Registrar fecha, versión/commit, entorno, datos de entrada, resultado esperado, resultado obtenido y evidencia.
+Registrar fecha, commit, entorno, entrada, esperado, obtenido y evidencia en [evidencias-demostracion.md](evidencias-demostracion.md).
 
-| Categoría | Caso mínimo | Resultado esperado | Métrica/evidencia |
+## Cómo ejecutar
+
+| Tipo | Comando |
+|---|---|
+| Unitarias / API (pytest + HTTPX) | Ver [tests/README.md](../tests/README.md) — un contenedor por servicio |
+| Carga (k6) | `k6 run tests/performance/labsentinel-smoke.js` con Compose arriba |
+| Manual / demo | [checklist-demostracion.md](checklist-demostracion.md) |
+
+## Matriz mínima
+
+| Categoría | Caso mínimo | Resultado esperado | Evidencia |
 | --- | --- | --- | --- |
-| Funcional | Inicio de sesión como admin o lector | Se obtiene credencial y se muestra solo la interfaz permitida | Código HTTP, respuesta y captura/log |
-| Seguridad | Credencial ausente, alterada o vencida | Acceso rechazado | Código HTTP y registro sin secretos |
-| Seguridad | Lector intenta crear dispositivo, umbral o reporte administrativo | Acceso denegado | Código HTTP 403 y política aplicada |
-| Seguridad | Usuario autorizado | Acceso permitido solo al recurso asignado | Respuesta y trazabilidad |
-| Rendimiento | Carga gradual de solicitudes autenticadas | Medir degradación controlada | Latencia, throughput, errores, CPU y RAM |
-| Escalabilidad | Incrementar usuarios virtuales (10 → 50 → 100, si el entorno lo permite) | Identificar límite y comportamiento | Tabla, gráfico e interpretación |
-| Comunicación | Indisponibilidad simulada de identidad o recurso | Fallo controlado sin fuga de acceso | Código de error, tiempo y logs |
+| Funcional | Login Google como admin o lector | Cookie de sesión y UI según rol | Captura + `/api/auth/me` |
+| Seguridad | Credencial ausente, alterada o vencida | 401 | pytest + curl sin cookie |
+| Seguridad | Lector crea dispositivo / cierra alerta / admin-summary | 403 | pytest device, alerts, reports |
+| Seguridad | Lector consulta inventario e historial | 200 | pytest |
+| Funcional | Lectura fuera de umbral genera alerta sin duplicar | Alerta activa única | pytest telemetry + UI Alertas |
+| Funcional | Ticket del lector con trazabilidad | 201 + historial “abierto” | pytest tickets |
+| Rendimiento | k6 smoke 5 VUs / 30 s sobre `/health` | Fallos &lt; 1%, p95 &lt; 800 ms | salida k6 |
+| Escalabilidad | Subir `VUS` a 10–50 si el equipo lo permite | Degradación documentada | tabla en evidencias |
 
-No presentar solo tablas: el informe debe interpretar los datos, condiciones de prueba y limitaciones del entorno.
+## Interpretación
+
+No presentar solo tablas: indicar condiciones (Docker Desktop, CPU disponible, SMTP desactivado) y si algún umbral de k6 se incumplió por el entorno local.
