@@ -47,8 +47,30 @@ export function TelemetryPage() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState("");
 
+  const [maxDateTime, setMaxDateTime] = useState(() =>
+    toDateTimeLocal(new Date()),
+  );
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  // Mantener actualizado el límite de fecha y hora actual.
+  useEffect(() => {
+    const updateMaxDateTime = () => {
+      setMaxDateTime(toDateTimeLocal(new Date()));
+    };
+
+    updateMaxDateTime();
+
+    const intervalId = window.setInterval(updateMaxDateTime, 60000);
+    window.addEventListener("focus", updateMaxDateTime);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", updateMaxDateTime);
+    };
+  }, []);
+
+  // Cargar los dispositivos disponibles.
   useEffect(() => {
     let mounted = true;
 
@@ -86,6 +108,7 @@ export function TelemetryPage() {
     };
   }, []);
 
+  // Consultar historial de lecturas.
   useEffect(() => {
     if (!appliedFilters) return;
 
@@ -123,6 +146,8 @@ export function TelemetryPage() {
       mounted = false;
     };
   }, [appliedFilters, page]);
+
+  // Consultar datos para las gráficas.
   useEffect(() => {
     if (!appliedFilters) return;
 
@@ -149,7 +174,10 @@ export function TelemetryPage() {
 
         if (!mounted) return;
 
-        const chartData = responses.flatMap((response) => response.items ?? []);
+        const chartData = responses.flatMap(
+          (response) => response.items ?? [],
+        );
+
         setChartReadings(chartData);
       } catch (requestError) {
         if (!mounted) return;
@@ -175,6 +203,7 @@ export function TelemetryPage() {
     }));
   }
 
+  // Validar fechas antes de consultar el historial.
   function submit(event) {
     event.preventDefault();
     setError("");
@@ -192,8 +221,25 @@ export function TelemetryPage() {
     const start = new Date(filters.startAt);
     const end = new Date(filters.endAt);
 
+    if (
+      !Number.isFinite(start.getTime()) ||
+      !Number.isFinite(end.getTime())
+    ) {
+      setError("Selecciona fechas válidas.");
+      return;
+    }
+
+    const now = new Date();
+
+    if (start > now || end > now) {
+      setError("No se permiten fechas futuras en el historial.");
+      return;
+    }
+
     if (start > end) {
-      setError("La fecha inicial no puede ser posterior a la fecha final.");
+      setError(
+        "La fecha inicial no puede ser posterior a la fecha final.",
+      );
       return;
     }
 
@@ -210,11 +256,15 @@ export function TelemetryPage() {
     <section className="telemetry-history-page">
       <header className="telemetry-history-header">
         <div>
-          <p className="telemetry-history-header__eyebrow">Monitoreo</p>
+          <p className="telemetry-history-header__eyebrow">
+            Monitoreo
+          </p>
+
           <h1>Historial de lecturas</h1>
+
           <p>
-            Consulta y analiza las métricas registradas por los dispositivos del
-            laboratorio.
+            Consulta y analiza las métricas registradas por los
+            dispositivos del laboratorio.
           </p>
         </div>
       </header>
@@ -223,8 +273,10 @@ export function TelemetryPage() {
         <div className="history-filter-card__heading">
           <div>
             <h2>Filtros de consulta</h2>
+
             <p>
-              Selecciona el dispositivo, la métrica y el período a analizar.
+              Selecciona el dispositivo, la métrica y el período
+              a analizar.
             </p>
           </div>
 
@@ -234,10 +286,13 @@ export function TelemetryPage() {
         <div className="history-filter-grid">
           <label>
             Dispositivo
+
             <select
               value={filters.deviceId}
               disabled={loadingDevices}
-              onChange={(event) => updateFilter("deviceId", event.target.value)}
+              onChange={(event) =>
+                updateFilter("deviceId", event.target.value)
+              }
             >
               {devices.length === 0 && (
                 <option value="">
@@ -257,6 +312,7 @@ export function TelemetryPage() {
 
           <label>
             Métrica
+
             <select
               value={filters.metricCode}
               onChange={(event) =>
@@ -271,11 +327,19 @@ export function TelemetryPage() {
 
           <label>
             Fecha inicial
+
             <div className="history-date-field">
               <CalendarDays size={16} aria-hidden="true" />
+
               <input
                 type="datetime-local"
                 value={filters.startAt}
+                max={
+                  filters.endAt &&
+                  filters.endAt < maxDateTime
+                    ? filters.endAt
+                    : maxDateTime
+                }
                 onChange={(event) =>
                   updateFilter("startAt", event.target.value)
                 }
@@ -285,12 +349,18 @@ export function TelemetryPage() {
 
           <label>
             Fecha final
+
             <div className="history-date-field">
               <CalendarDays size={16} aria-hidden="true" />
+
               <input
                 type="datetime-local"
                 value={filters.endAt}
-                onChange={(event) => updateFilter("endAt", event.target.value)}
+                min={filters.startAt}
+                max={maxDateTime}
+                onChange={(event) =>
+                  updateFilter("endAt", event.target.value)
+                }
               />
             </div>
           </label>
@@ -300,7 +370,10 @@ export function TelemetryPage() {
           <button
             type="submit"
             className="device-primary-btn"
-            disabled={loadingDevices || devices.length === 0}
+            disabled={
+              loadingDevices ||
+              devices.length === 0
+            }
           >
             <Search size={16} />
             Consultar historial
@@ -313,14 +386,20 @@ export function TelemetryPage() {
           {error}
         </p>
       )}
+
       <div className="history-chart-card">
         <div className="history-chart-card__header">
           <div>
             <p className="telemetry-history-header__eyebrow">
               COMPORTAMIENTO HISTÓRICO
             </p>
+
             <h2>Lecturas en el período seleccionado</h2>
-            <p>Evolución de las métricas registradas por el dispositivo.</p>
+
+            <p>
+              Evolución de las métricas registradas por el
+              dispositivo.
+            </p>
           </div>
         </div>
 
@@ -345,9 +424,11 @@ export function TelemetryPage() {
           <div className="history-chart-groups">
             <div className="history-chart-group">
               <h3>Temperatura</h3>
+
               <TelemetryHistoryChart
                 readings={chartReadings.filter(
-                  (reading) => reading.metric_code === "temperatura",
+                  (reading) =>
+                    reading.metric_code === "temperatura",
                 )}
                 metricCode="temperatura"
               />
@@ -355,9 +436,11 @@ export function TelemetryPage() {
 
             <div className="history-chart-group">
               <h3>Humedad</h3>
+
               <TelemetryHistoryChart
                 readings={chartReadings.filter(
-                  (reading) => reading.metric_code === "humedad",
+                  (reading) =>
+                    reading.metric_code === "humedad",
                 )}
                 metricCode="humedad"
               />
@@ -365,13 +448,19 @@ export function TelemetryPage() {
           </div>
         )}
       </div>
+
       <section className="history-results-card">
         <header className="history-results-card__header">
           <div>
             <h2>Lecturas registradas</h2>
+
             <p>
               {appliedFilters
-                ? `${total} lectura${total === 1 ? "" : "s"} encontrada${total === 1 ? "" : "s"}`
+                ? `${total} lectura${
+                    total === 1 ? "" : "s"
+                  } encontrada${
+                    total === 1 ? "" : "s"
+                  }`
                 : "Aplica los filtros para consultar el historial."}
             </p>
           </div>
@@ -385,13 +474,17 @@ export function TelemetryPage() {
           <div className="history-empty-state">
             <Search size={28} />
             <p>Selecciona los filtros para comenzar.</p>
-            <span>El historial del dispositivo aparecerá en esta sección.</span>
+            <span>
+              El historial del dispositivo aparecerá en esta sección.
+            </span>
           </div>
         ) : readings.length === 0 ? (
           <div className="history-empty-state">
             <Search size={28} />
             <p>No se encontraron lecturas.</p>
-            <span>Prueba con otro período, dispositivo o métrica.</span>
+            <span>
+              Prueba con otro período, dispositivo o métrica.
+            </span>
           </div>
         ) : (
           <>
@@ -411,13 +504,27 @@ export function TelemetryPage() {
                 <tbody>
                   {readings.map((reading) => (
                     <tr key={reading.id}>
-                      <td>{formatDate(reading.recorded_at)}</td>
-                      <td className="history-metric">{reading.metric_code}</td>
                       <td>
-                        <strong>{Number(reading.value).toFixed(2)}</strong>
+                        {formatDate(reading.recorded_at)}
                       </td>
+
+                      <td className="history-metric">
+                        {reading.metric_code}
+                      </td>
+
+                      <td>
+                        <strong>
+                          {Number(reading.value).toFixed(2)}
+                        </strong>
+                      </td>
+
                       <td>{reading.unit}</td>
-                      <td>{reading.equipment_status ?? "Sin estado"}</td>
+
+                      <td>
+                        {reading.equipment_status ??
+                          "Sin estado"}
+                      </td>
+
                       <td>{reading.source}</td>
                     </tr>
                   ))}
@@ -428,14 +535,23 @@ export function TelemetryPage() {
             <footer className="history-pagination">
               <span>
                 Mostrando {page * PAGE_SIZE + 1}–
-                {Math.min((page + 1) * PAGE_SIZE, total)} de {total}
+                {Math.min(
+                  (page + 1) * PAGE_SIZE,
+                  total,
+                )} de {total}
               </span>
 
               <div>
                 <button
                   type="button"
-                  disabled={page === 0 || loadingHistory}
-                  onClick={() => setPage((current) => Math.max(0, current - 1))}
+                  disabled={
+                    page === 0 || loadingHistory
+                  }
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.max(0, current - 1),
+                    )
+                  }
                 >
                   Anterior
                 </button>
@@ -446,8 +562,13 @@ export function TelemetryPage() {
 
                 <button
                   type="button"
-                  disabled={page + 1 >= totalPages || loadingHistory}
-                  onClick={() => setPage((current) => current + 1)}
+                  disabled={
+                    page + 1 >= totalPages ||
+                    loadingHistory
+                  }
+                  onClick={() =>
+                    setPage((current) => current + 1)
+                  }
                 >
                   Siguiente
                 </button>
