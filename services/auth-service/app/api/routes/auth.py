@@ -1,20 +1,30 @@
 import bcrypt
+import secrets
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.schemas.auth import AuthMessageResponse, GoogleLoginRequest, PasswordLoginRequest, UserInviteCreate, UserResponse, UserRoleUpdate
-from app.auth.cookies import clear_session_cookie, set_session_cookie
+from app.auth.cookies import clear_keycloak_login_cookies, clear_session_cookie, set_keycloak_login_cookies, set_session_cookie
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.auth.google import GoogleTokenVerificationError, verify_google_id_token
 from app.auth.jwt_utils import create_session_token
+from app.auth.keycloak import KeycloakAuthenticationError, authorization_url, create_pkce_pair, create_state, exchange_code, logout_url, profile_from_claims, verify_id_token
 from app.core.config import Settings, get_settings
 from app.db.models import User
 from app.db.session import get_db
 from app.repositories.user_repository import UserRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def keycloak_error_redirect(settings: Settings, message: str) -> RedirectResponse:
+    query = urlencode({"auth_error": message})
+    separator = "&" if "?" in settings.keycloak_frontend_url else "?"
+    return RedirectResponse(f"{settings.keycloak_frontend_url}{separator}{query}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/health")
@@ -83,6 +93,56 @@ def login_with_google(
         message="Sesión iniciada correctamente",
         user=UserResponse.model_validate(user),
     )
+
+
+@router.get("/keycloak/login", summary="Iniciar sesión con Keycloak mediante Authorization Code y PKCE")
+def login_with_keycloak(settings: Settings = Depends(get_settings)) -> RedirectResponse:
+    if not settings.keycloak_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acceso con Keycloak no habilitado")
+    state = create_state()
+    verifier, challenge = create_pkce_pair()
+    response = RedirectResponse(
+        authorization_url(settings, state=state, challenge=challenge),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+    set_keycloak_login_cookies(response, state=state, verifier=verifier, settings=settings)
+    return response
+
+
+@router.get("/keycloak/callback", summary="Finalizar sesión de Keycloak y crear la sesión interna")
+def keycloak_callback(
+    request: Request,
+    code: str | None = Query(default=None, min_length=1),
+    state: str | None = Query(default=None, min_length=1),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RedirectResponse:
+    if not settings.keycloak_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acceso con Keycloak no habilitado")
+    expected_state = request.cookies.get(settings.keycloak_state_cookie_name)
+    verifier = request.cookies.get(settings.keycloak_verifier_cookie_name)
+    if not code or not state or not expected_state or not verifier or not secrets.compare_digest(state, expected_state):
+        response = keycloak_error_redirect(settings, "No se pudo validar la solicitud de Keycloak. Intenta nuevamente.")
+        clear_keycloak_login_cookies(response, settings)
+        return response
+    try:
+        token_set = exchange_code(settings, code=code, verifier=verifier)
+        profile = profile_from_claims(verify_id_token(settings, token_set["id_token"]))
+        user = UserRepository(db).get_or_create_from_keycloak(**profile)
+    except (KeycloakAuthenticationError, PermissionError) as exc:
+        response = keycloak_error_redirect(settings, str(exc))
+        clear_keycloak_login_cookies(response, settings)
+        return response
+    except IntegrityError:
+        db.rollback()
+        response = keycloak_error_redirect(settings, "No se pudo vincular la cuenta de Keycloak.")
+        clear_keycloak_login_cookies(response, settings)
+        return response
+
+    response = RedirectResponse(settings.keycloak_frontend_url, status_code=status.HTTP_303_SEE_OTHER)
+    set_session_cookie(response, create_session_token(user, settings), settings)
+    clear_keycloak_login_cookies(response, settings)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -184,4 +244,7 @@ def logout(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
     clear_session_cookie(response, settings)
-    return {"message": "Signed out successfully"}
+    payload = {"message": "Signed out successfully"}
+    if settings.keycloak_enabled:
+        payload["keycloak_logout_url"] = logout_url(settings)
+    return payload
