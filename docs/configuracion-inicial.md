@@ -31,6 +31,35 @@ Edite `.env` y defina al menos:
 | `SIMULATOR_ENABLED` | `true` para alimentar dashboards |
 | `CORS_ORIGINS` | `http://localhost:8080,http://localhost:5173` |
 
+## Inicio de sesión opcional con Keycloak
+
+Google y el login local continúan funcionando sin cambios cuando `KEYCLOAK_ENABLED=false`.
+Para habilitar Keycloak en desarrollo, configure en `.env`:
+
+```dotenv
+KEYCLOAK_ENABLED=true
+VITE_KEYCLOAK_ENABLED=true
+KEYCLOAK_URL_PUBLIC=http://localhost:8081
+KEYCLOAK_URL_INTERNAL=http://keycloak:8080
+KEYCLOAK_REALM=labsentinel
+KEYCLOAK_CLIENT_ID=labsentinel-web
+KEYCLOAK_REDIRECT_URI=http://localhost:8080/api/auth/keycloak/callback
+KEYCLOAK_FRONTEND_URL=http://localhost:8080/
+```
+
+El realm incluido usa un cliente **público** con Authorization Code + PKCE S256:
+no configure ni suba un `client_secret` para el frontend. Cree los usuarios desde la
+consola de Keycloak y asígneles el rol de realm `admin` o `lector`; el callback valida
+firma RS256, emisor, audiencia, expiración y rol antes de crear la sesión HttpOnly de
+LabSentinel. La identidad se enlaza por el `sub` de Keycloak y por correo solo en el
+primer vínculo, evitando sustituir identidades existentes.
+
+`start-dev --import-realm` importa el archivo únicamente cuando el realm no existe.
+Si Keycloak ya se inició antes, replique los cambios del cliente en la consola (redirect
+URI exacta, PKCE S256 y Direct Access Grants deshabilitado) o recree solamente el entorno
+local según el procedimiento acordado por el equipo. Nunca use `down -v` en un entorno
+con datos que deban conservarse.
+
 ## Arranque
 
 ```powershell
