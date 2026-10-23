@@ -12,7 +12,9 @@ Plataforma telemática segura para el monitoreo de laboratorios mediante microse
 - Infraestructura: Docker Compose.
 - Pruebas: pytest + HTTPX (por servicio) y k6 (carga).
 
-Keycloak permanece en el compose como componente de identidad legacy/opcional; el login de la aplicación usa Google + `auth-service`.
+Keycloak es un proveedor de identidad opcional: cuando se habilita, `auth-service` usa
+Authorization Code + PKCE S256 y conserva la misma sesión JWT HttpOnly interna. Google
+continúa disponible mientras `KEYCLOAK_ENABLED=false`.
 
 ## Inicio rápido
 
@@ -47,6 +49,7 @@ Checklist de demostración: [docs/checklist-demostracion.md](docs/checklist-demo
 | `SIMULATOR_API_KEY` | Cabecera `X-Simulator-Key` del simulador |
 | `SIMULATOR_ENABLED` / `SIMULATOR_INTERVAL_SECONDS` | Control del simulador |
 | `CORS_ORIGINS` | Orígenes permitidos (p. ej. `http://localhost:8080`) |
+| `KEYCLOAK_ENABLED` / `VITE_KEYCLOAK_ENABLED` | Activa el acceso opcional con Keycloak en backend y UI |
 
 Plantilla completa: [`.env.example`](.env.example). Nunca suba `.env` al repositorio.
 

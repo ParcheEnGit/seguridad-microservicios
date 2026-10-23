@@ -10,7 +10,7 @@ La evidencia se registra en `docs/plan-pruebas.md` y `docs/evidencias-demostraci
 | `tests/performance/` | Escenario k6 de humo/carga inicial |
 | `tests/security/` | Índice de casos de seguridad (enlaza a pytest) |
 
-## Pytest / HTTPX (permisos, lecturas, alertas, tickets)
+## Pytest / HTTPX (autenticación, permisos, lecturas, alertas y tickets)
 
 Desde Git Bash en Windows (recomendado si no hay pytest local):
 
@@ -30,10 +30,20 @@ run_service_tests device-service
 run_service_tests report-service
 ```
 
+El contrato OIDC de `auth-service` no requiere base de datos ni un Keycloak
+activo; se puede validar por separado con Python 3.11:
+
+```powershell
+Set-Location services/auth-service
+$env:PYTHONPATH = $PWD.Path
+uv run --python 3.11 --with-requirements requirements.txt python -m unittest discover -s tests -v
+```
+
 Cobertura esperada:
 
 | Área | Archivos principales |
 |---|---|
+| Keycloak: PKCE, roles y claims | `auth-service/tests/test_keycloak.py` |
 | Lecturas / umbrales / historial | `telemetry-service/tests/test_reading_*.py` |
 | Alertas admin/lector | `alert-ticket-service/tests/test_alert_management.py` |
 | Tickets | `alert-ticket-service/tests/test_tickets_security.py`, `test_ticket_traceability.py` |
