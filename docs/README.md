@@ -1,33 +1,41 @@
 # Guía de documentación
 
-Esta carpeta organiza la evidencia del proyecto sin adelantar decisiones tecnológicas. Cada sección debe actualizarse con evidencia real a medida que avance el prototipo.
+Evidencia del prototipo LabSentinel. Actualizar con resultados reales en cada demo.
 
-## Base disponible
+## Documentos operativos
 
-- [Perfil del proyecto](perfil-proyecto.md): propuesta inicial alineada con el Trabajo 36.
-- [Arquitectura](arquitectura.md): componentes y flujos de seguridad por validar.
-- [Tecnologías](tecnologias.md): matriz para registrar la decisión justificada.
-- [Plan de pruebas](plan-pruebas.md): evidencias que se deben obtener durante la implementación.
-- [Manual técnico](manual-tecnico.md): plantilla para que otra persona pueda ejecutar el proyecto.
+- [Configuración inicial / arranque](configuracion-inicial.md)
+- [Arquitectura y diagramas Mermaid](arquitectura.md)
+- [Manual técnico](manual-tecnico.md)
+- [Configuración de telemetría / simulador](conf-telemetria.md)
+- [Modelo de datos](modelo-datos.md)
+- [Plan de pruebas](plan-pruebas.md)
+- [Checklist de demostración](checklist-demostracion.md)
+- [Plantilla de evidencias](evidencias-demostracion.md)
 
-## Índice del informe final requerido
+## Contexto del informe
 
-1. Perfil del proyecto (título, línea temática, descripción, alcance, entregables y cronograma).
-2. Planteamiento del problema (contexto, situación, pregunta y diagrama de causas/consecuencias).
-3. Justificación (tecnológica, académica, práctica, económica y social).
-4. Objetivos (general y 4–6 específicos).
-5. Marco teórico.
-6. Estado del arte.
-7. Diseño de arquitectura (general, componentes, comunicación, flujo y despliegue).
-8. Tecnologías y protocolos (con justificación comparativa).
-9. Implementación.
-10. Pruebas experimentales.
-11. Análisis de resultados.
-12. Conclusiones.
-13. Recomendaciones.
-14. Manual técnico.
-15. Presentación y demostración.
-16. Código fuente y documentación técnica.
-17. Referencias y anexos.
+- [Perfil del proyecto](perfil-proyecto.md)
+- [Tecnologías](tecnologias.md)
 
-Las capturas y resultados deben llevar número de figura o tabla, descripción y explicación en el texto; no basta con adjuntarlos.
+## Índice del informe final
+
+1. Perfil del proyecto  
+2. Planteamiento del problema  
+3. Justificación  
+4. Objetivos  
+5. Marco teórico  
+6. Estado del arte  
+7. Diseño de arquitectura  
+8. Tecnologías y protocolos  
+9. Implementación  
+10. Pruebas experimentales  
+11. Análisis de resultados  
+12. Conclusiones  
+13. Recomendaciones  
+14. Manual técnico  
+15. Presentación y demostración  
+16. Código fuente y documentación técnica  
+17. Referencias y anexos  
+
+Las capturas deben numerarse y explicarse en el texto.
