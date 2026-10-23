@@ -116,3 +116,46 @@ class DeviceReportResponse(BaseModel):
     timeline: list[DeviceReportTimelinePoint]
     devices: list[DeviceReportDetail]
     generated_at: datetime
+
+
+# HU11: Esquemas para reportes administrativos de alertas.
+
+
+class AlertReportSummary(BaseModel):
+    total: int
+    criticas: int
+    advertencias: int
+    abiertas: int
+    revisadas: int
+    cerradas: int
+
+
+class AlertReportDetail(BaseModel):
+    id: UUID
+    device_id: UUID
+    device_code: str | None = None
+    device_name: str | None = None
+    metric_code: str
+    value: Decimal
+    unit: str
+    severity: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    resolved_at: datetime | None = None
+
+
+class AlertReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+    criticas: int
+    advertencias: int
+
+
+class AlertReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: AlertReportSummary
+    timeline: list[AlertReportTimelinePoint]
+    alerts: list[AlertReportDetail]
+    generated_at: datetime

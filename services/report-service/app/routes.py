@@ -20,8 +20,12 @@ from app.report_queries import (
     DEVICE_REPORT_SUMMARY_SQL,
     DEVICE_REPORT_DETAILS_SQL,
     DEVICE_REPORT_TIMELINE_SQL,
+    ALERT_REPORT_SUMMARY_SQL,
+    ALERT_REPORT_DETAILS_SQL,
+    ALERT_REPORT_TIMELINE_SQL,
 )
-from app.schemas import DeviceReportResponse
+
+from app.schemas import DeviceReportResponse, AlertReportResponse
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -223,6 +227,83 @@ def devices_report(
         end_date=end_date,
         summary=summary,
         devices=devices,
+        timeline=timeline,
+        generated_at=datetime.now(timezone.utc),
+    )
+
+
+
+# HU11: Reporte administrativo de alertas.
+@router.get(
+    "/reports/alerts",
+    response_model=AlertReportResponse,
+    summary="Generar reporte de alertas por período",
+)
+def alerts_report(
+    start_date: date = Query(..., description="Fecha inicial (AAAA-MM-DD)"),
+    end_date: date = Query(..., description="Fecha final (AAAA-MM-DD)"),
+    device_id: UUID | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    alert_status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> AlertReportResponse:
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
+    if severity not in (None, "advertencia", "critica"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La severidad de la alerta no es válida",
+        )
+
+    if alert_status not in (None, "abierta", "revisada", "cerrada"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El estado de la alerta no es válido",
+        )
+
+    start_datetime = datetime.combine(
+        start_date,
+        time.min,
+        tzinfo=timezone.utc,
+    )
+    end_datetime = datetime.combine(
+        end_date + timedelta(days=1),
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    params = {
+        "start_date": start_datetime,
+        "end_date": end_datetime,
+        "device_id": str(device_id) if device_id else None,
+        "severity": severity,
+        "alert_status": alert_status,
+    }
+
+    summary = dict(
+        db.execute(ALERT_REPORT_SUMMARY_SQL, params).mappings().one()
+    )
+
+    alerts = [
+        dict(row)
+        for row in db.execute(ALERT_REPORT_DETAILS_SQL, params).mappings()
+    ]
+
+    timeline = [
+        dict(row)
+        for row in db.execute(ALERT_REPORT_TIMELINE_SQL, params).mappings()
+    ]
+
+    return AlertReportResponse(
+        start_date=start_date,
+        end_date=end_date,
+        summary=summary,
+        alerts=alerts,
         timeline=timeline,
         generated_at=datetime.now(timezone.utc),
     )
