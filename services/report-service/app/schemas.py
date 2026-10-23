@@ -80,3 +80,39 @@ class DeviceTelemetrySeries(BaseModel):
     points: list[DeviceTelemetryPoint]
     period: str
     resolution: str
+
+
+# HU11: Esquemas para reportes administrativos de dispositivos.
+
+from datetime import date
+
+
+class DeviceReportSummary(BaseModel):
+    total: int
+    activos: int
+    inactivos: int
+    mantenimiento: int
+
+
+class DeviceReportDetail(BaseModel):
+    id: UUID
+    device_code: str
+    name: str
+    device_type: str
+    location: str
+    status: str
+    created_at: datetime
+
+
+class DeviceReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+
+
+class DeviceReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: DeviceReportSummary
+    timeline: list[DeviceReportTimelinePoint]
+    devices: list[DeviceReportDetail]
+    generated_at: datetime

@@ -5,7 +5,8 @@ de los demás servicios para mostrarla. Por eso solo ejecuta SELECT de solo lect
 sobre los esquemas device_service, telemetry_service y alert_ticket_service.
 Nunca inserta, actualiza ni borra datos que pertenecen a otros servicios.
 """
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
@@ -14,6 +15,13 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import AdminSummary, DeviceTelemetrySeries
 from app.security import get_current_claims, require_admin
+
+from app.report_queries import (
+    DEVICE_REPORT_SUMMARY_SQL,
+    DEVICE_REPORT_DETAILS_SQL,
+    DEVICE_REPORT_TIMELINE_SQL,
+)
+from app.schemas import DeviceReportResponse
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -155,4 +163,66 @@ def device_telemetry(
         points=[dict(row) for row in db.execute(DEVICE_SERIES_SQL, {"period": period_interval, "bucket": bucket}).mappings()],
         period=period,
         resolution=next(key for key, value in RESOLUTION_OPTIONS.items() if value == bucket),
+    )
+
+# HU11: Reporte administrativo de dispositivos.
+@router.get(
+    "/reports/devices",
+    response_model=DeviceReportResponse,
+    summary="Generar reporte de dispositivos por período",
+)
+def devices_report(
+    start_date: date = Query(..., description="Fecha inicial (AAAA-MM-DD)"),
+    end_date: date = Query(..., description="Fecha final (AAAA-MM-DD)"),
+    device_id: UUID | None = Query(default=None),
+    device_status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> DeviceReportResponse:
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
+    if device_status not in (None, "activo", "inactivo", "mantenimiento"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El estado del dispositivo no es válido",
+        )
+
+    # Se incluye el día final completo mediante un límite superior exclusivo.
+    start_datetime = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+    end_datetime = datetime.combine(
+        end_date + timedelta(days=1),
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    params = {
+        "start_date": start_datetime,
+        "end_date": end_datetime,
+        "device_id": str(device_id) if device_id else None,
+        "device_status": device_status,
+    }
+
+    summary = dict(db.execute(DEVICE_REPORT_SUMMARY_SQL, params).mappings().one())
+
+    devices = [
+        dict(row)
+        for row in db.execute(DEVICE_REPORT_DETAILS_SQL, params).mappings()
+    ]
+
+    timeline = [
+        dict(row)
+        for row in db.execute(DEVICE_REPORT_TIMELINE_SQL, params).mappings()
+    ]
+
+    return DeviceReportResponse(
+        start_date=start_date,
+        end_date=end_date,
+        summary=summary,
+        devices=devices,
+        timeline=timeline,
+        generated_at=datetime.now(timezone.utc),
     )
