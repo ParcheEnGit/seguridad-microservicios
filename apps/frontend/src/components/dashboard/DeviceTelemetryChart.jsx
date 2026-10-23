@@ -101,7 +101,7 @@ export function DeviceTelemetryChart() {
       <header className="admin-card-header">
         <div>
           <h2 className="dashboard-card__title">Lecturas por dispositivo</h2>
-          <p className="device-telemetry-card__subtitle">Selecciona la métrica, el periodo y la resolución de visualización.</p>
+          <p className="device-telemetry-card__subtitle">Selecciona la métrica, el periodo y el intervalo de muestreo.</p>
         </div>
         <button type="button" className="device-telemetry-card__expand" onClick={() => setExpanded((current) => !current)}>
           {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -111,7 +111,7 @@ export function DeviceTelemetryChart() {
 
       <div className="telemetry-controls">
         <div><span>Periodo</span>{PERIODS.map(([value, label]) => <button key={value} type="button" className={period === value ? "is-active" : ""} onClick={() => setPeriod(value)}>{label}</button>)}</div>
-        <div><span>Resolución</span>{RESOLUTIONS.map(([value, label]) => <button key={value} type="button" className={resolution === value ? "is-active" : ""} onClick={() => setResolution(value)}>{label}</button>)}</div>
+        <div><span>Intervalo de muestreo</span>{RESOLUTIONS.map(([value, label]) => <button key={value} type="button" className={resolution === value ? "is-active" : ""} onClick={() => setResolution(value)}>{label}</button>)}</div>
         <div><span>Métrica</span>{Object.entries(METRICS).map(([value, label]) => <button key={value} type="button" className={metric === value ? "is-active" : ""} onClick={() => setMetric(value)}>{label}</button>)}</div>
       </div>
 
@@ -130,7 +130,7 @@ export function DeviceTelemetryChart() {
         </div>
       )}
 
-      {denseView && <p className="telemetry-density-note">Vista de alta densidad: oculta dispositivos o usa una resolución de 5 min o mayor para mejorar la lectura.</p>}
+      {denseView && <p className="telemetry-density-note">Vista de alta densidad: oculta dispositivos o usa un intervalo de muestreo de 5 min o mayor para mejorar la lectura.</p>}
       {!data && !error && <p className="device-muted"><LoaderCircle size={16} className="telemetry-loading" /> Cargando lecturas por dispositivo...</p>}
       {error && <p className="device-form-error">{error}</p>}
 
@@ -141,15 +141,20 @@ export function DeviceTelemetryChart() {
             {activeLines.map((line) => (
               <g key={line.id}>
                 <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke={line.color} strokeWidth={denseView ? "1.5" : "2.3"} strokeOpacity={denseView ? ".72" : "1"} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                {line.values.slice(1).map((value, index) => {
+                  const previous = line.values[index];
+                  return value.out_of_range && <line key={`alert-${value.bucket}`} x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" />;
+                })}
                 <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" onMouseMove={(event) => chooseNearest(event, line)} />
-                {line.values.length === 1 && <circle cx={pointX(line.values[0].time)} cy={pointY(line.values[0].value)} r="4" fill={line.color} className="admin-chart__point" />}
+                {line.values.filter((value) => value.out_of_range).map((value) => <circle key={`alert-point-${value.bucket}`} cx={pointX(value.time)} cy={pointY(value.value)} r="4.5" fill="#d93025" className="admin-chart__point" />)}
+                {line.values.length === 1 && <circle cx={pointX(line.values[0].time)} cy={pointY(line.values[0].value)} r="4" fill={line.values[0].out_of_range ? "#d93025" : line.color} className="admin-chart__point" />}
               </g>
             ))}
             {hovered && <line x1={pointX(hovered.time)} x2={pointX(hovered.time)} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}
             <text x={PAD.left} y={HEIGHT - 10} className="admin-chart__label">{formatTime(start, period)}</text>
             <text x={WIDTH - PAD.right} y={HEIGHT - 10} textAnchor="end" className="admin-chart__label">Ahora</text>
           </svg>
-          {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.device}: {hovered.value.toFixed(2)} {metric === "temperatura" ? "°C" : "%"}</strong><span>{formatTime(hovered.bucket, period)}</span></div>}
+          {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.device}: {hovered.value.toFixed(2)} {metric === "temperatura" ? "°C" : "%"}</strong><span>{formatTime(hovered.bucket, period)}{hovered.out_of_range ? " · Fuera de umbral" : ""}{hovered.simulated_peak ? " · Pico de simulación" : ""}</span></div>}
           {values.length > 0 && <p className="device-telemetry-chart__range">Rango visible: {min.toFixed(2)}–{max.toFixed(2)} {metric === "temperatura" ? "°C" : "%"}</p>}
           {values.length === 0 && <p className="device-muted">No hay dispositivos seleccionados o lecturas para este periodo.</p>}
         </div>

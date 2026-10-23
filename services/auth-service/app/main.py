@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
@@ -25,9 +25,22 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+
+@app.middleware("http")
+async def redact_keycloak_callback_query(request: Request, call_next):
+    """Evita que código de autorización y state queden en el access log.
+
+    El handler aún recibe los parámetros durante `call_next`; se eliminan del
+    scope inmediatamente antes de que Uvicorn escriba la línea de acceso.
+    """
+    response = await call_next(request)
+    if request.url.path == "/auth/keycloak/callback":
+        request.scope["query_string"] = b""
+    return response
 
 app.include_router(auth_router)
 

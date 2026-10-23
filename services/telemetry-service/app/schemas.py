@@ -13,6 +13,7 @@ class TelemetryReadingCreate(BaseModel):
     unit: str = Field(min_length=1, max_length=20)
     equipment_status: str | None = Field(default=None, max_length=30)
     recorded_at: datetime | None = None
+    payload: dict = Field(default_factory=dict)
 
     @field_validator("metric_code", "unit")
     @classmethod
@@ -48,6 +49,7 @@ class SimulationMetric(BaseModel):
     unit: str
     min_value: float | None = None
     max_value: float | None = None
+    has_threshold: bool = False
 
 class TelemetryHistoryResponse(BaseModel):
     items: list[TelemetryReadingResponse]
@@ -76,5 +78,6 @@ class SimulationPeak(BaseModel):
     metric_code: str
     unit: str
     value: float
+    cycles_total: int
     cycles_remaining: int
     created_at: datetime

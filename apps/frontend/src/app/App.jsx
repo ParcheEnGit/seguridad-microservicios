@@ -7,6 +7,7 @@ import { fetchCurrentUser, logout } from "../services/authApi.js";
 import { isAdmin } from "../constants/roles.js";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const keycloakEnabled = import.meta.env.VITE_KEYCLOAK_ENABLED === "true";
 
 function AppContent() {
   const [user, setUser] = useState(null);
@@ -36,10 +37,15 @@ function AppContent() {
   }, []);
 
   async function handleLogout() {
+    let keycloakLogoutUrl;
     try {
-      await logout();
+      const result = await logout();
+      keycloakLogoutUrl = result.keycloak_logout_url;
     } finally {
       setUser(null);
+    }
+    if (keycloakLogoutUrl) {
+      window.location.assign(keycloakLogoutUrl);
     }
   }
 
@@ -68,23 +74,21 @@ function AppContent() {
 }
 
 export function App() {
-  if (!googleClientId) {
+  if (!googleClientId && !keycloakEnabled) {
     return (
       <main className="auth-page">
         <section className="auth-card">
           <h1 className="auth-title">Configuración requerida</h1>
           <p className="auth-subtitle">
-            Configura <code>VITE_GOOGLE_CLIENT_ID</code> en el archivo <code>.env</code>
-            para habilitar el inicio de sesión con Google.
+            Configura <code>VITE_GOOGLE_CLIENT_ID</code> o habilita <code>VITE_KEYCLOAK_ENABLED</code>
+            en el archivo <code>.env</code> para habilitar el inicio de sesión.
           </p>
         </section>
       </main>
     );
   }
 
-  return (
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <AppContent />
-    </GoogleOAuthProvider>
-  );
+  if (!googleClientId) return <AppContent />;
+
+  return <GoogleOAuthProvider clientId={googleClientId}><AppContent /></GoogleOAuthProvider>;
 }

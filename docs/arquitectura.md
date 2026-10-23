@@ -1,51 +1,68 @@
 # Arquitectura lógica y de seguridad
 
-## Componentes aprobados
+## Componentes
 
 | Componente | Responsabilidad | Acceso |
 | --- | --- | --- |
-| React | Interfaz de administración, consulta y tickets | Admin y lector |
-| Nginx | Entrada única y proxy inverso | Público |
-| Keycloak | Identidad, roles `admin`/`lector` y clientes técnicos | Login y administración restringida |
-| Device service | Inventario y estado de dispositivos | Admin escribe; lector consulta |
-| Telemetry service | Lecturas enviadas por simulador | Simulador publica; usuarios consultan según rol |
-| Alert-ticket service | Umbrales, alertas y tickets no críticos | Admin gestiona; lector crea/consulta tickets |
-| Report service | Resúmenes y reportes autorizados | Admin completo; lector limitado |
-| PostgreSQL | Persistencia interna | Solo servicios |
+| React | Dashboards Admin y Lector, tickets, telemetría | Admin y lector |
+| Nginx | Entrada única y proxy inverso | Público (`:8080`) |
+| auth-service | Google OAuth, cookie JWT HttpOnly, roles `0`/`1` | Login y sesión |
+| Keycloak | Identidad legacy / opcional en desarrollo | Puerto `8081` |
+| Device service | Inventario y umbrales | Admin escribe; lector consulta |
+| Telemetry service | Lecturas del simulador e historial | Simulador publica; usuarios consultan |
+| Alert-ticket service | Alertas y tickets no críticos | Admin gestiona alertas; lector crea tickets |
+| Report service | Resúmenes de dashboards | Admin completo; lector limitado |
+| Simulator device | Genera lecturas periódicas | Clave `X-Simulator-Key` |
+| PostgreSQL | Persistencia por esquemas | Solo red interna de servicios |
 
-## Flujo principal
+## Flujo principal (sesión actual)
 
 ```mermaid
 sequenceDiagram
     participant U as Admin o lector
     participant F as React
-    participant K as Keycloak
     participant G as Nginx
-    participant S as Servicio protegido
+    participant A as auth-service
+    participant Google as Google OAuth
+    participant S as Microservicio
 
-    U->>F: Inicia sesión
-    F->>K: Autenticación OIDC
-    K-->>F: Token con rol
-    F->>G: Solicitud + Bearer token
+    U->>F: Inicia sesión con Google
+    F->>Google: Obtiene ID token
+    F->>G: POST /api/auth/google + credential
+    G->>A: Reenvía al auth-service
+    A->>Google: Verifica ID token (email_verified)
+    A-->>F: Cookie HttpOnly labsentinel_session (JWT)
+    U->>F: Usa Dashboard Admin o Lector
+    F->>G: Solicitud /api/... + cookie
     G->>S: Solicitud enrutada
-    S->>S: Valida firma, expiración, emisor, audiencia y rol
-    S-->>G: Respuesta o rechazo 401/403
+    S->>S: Valida JWT, expiración y rol
+    S-->>G: Respuesta o 401/403
     G-->>F: Respuesta
 ```
 
-## Controles mínimos a implementar
+## Flujo de telemetría y alertas
 
-- Las credenciales no se almacenan ni transmiten en texto plano.
-- El recurso protegido verifica autenticación y autorización; no debe confiar solo en la interfaz o el gateway.
-- Las credenciales tendrán vigencia limitada y se validarán emisor, audiencia, firma y expiración cuando el mecanismo elegido lo permita.
-- Los secretos se configurarán por variables de entorno y nunca se versionarán.
-- Las respuestas de error no expondrán secretos ni información innecesaria.
-- Se registrarán eventos de autenticación y rechazo sin almacenar contraseñas o tokens completos.
+```mermaid
+flowchart LR
+    Sim[simulator-device] -->|X-Simulator-Key POST /readings| Tel[telemetry-service]
+    Tel -->|Evalúa umbrales| DB[(PostgreSQL)]
+    Tel -->|Crea alerta si aplica| Alerts[alert_ticket_service.alerts]
+    Admin[Dashboard Admin] -->|Cookie JWT| GW[Nginx]
+    Lector[Dashboard Lector] -->|Cookie JWT| GW
+    GW --> Tel
+    GW --> Alerts
+    GW --> Dev[device-service]
+    GW --> Rep[report-service]
+```
+
+## Controles de seguridad
+
+- Credenciales de sesión en cookie HttpOnly; no se almacenan tokens de Google en el frontend.
+- Cada servicio verifica firma, expiración y rol del JWT; no confiar solo en la UI o el gateway.
+- `ADMIN_EMAILS` solo aplica al primer alta; el rol en BD no se sobrescribe en logins posteriores.
+- Secretos solo en `.env` (no versionado).
+- Errores 401/403 sin filtrar secretos.
 
 ## Decisiones adoptadas
 
-FastAPI/Python 3.11, React/Vite, Keycloak OAuth 2.0/OIDC, RBAC con roles `admin` y `lector`, Nginx, PostgreSQL y Docker Compose. La primera versión usa HTTP local para desarrollo; HTTPS/TLS será una mejora documentada para despliegue real.
-
-## Diagramas que faltará elaborar
-
-Antes de implementar: arquitectura general, componentes, comunicación, flujo de información y despliegue. Este documento contiene solo el boceto lógico inicial.
+FastAPI/Python 3.11, React/Vite, Google OAuth + JWT propio, RBAC (`0` admin / `1` lector), Nginx, PostgreSQL 18 y Docker Compose. Desarrollo local en HTTP; HTTPS/TLS queda como mejora de despliegue.

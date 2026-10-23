@@ -21,8 +21,23 @@ class Settings(BaseSettings):
     cookie_name: str = "labsentinel_session"
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
+    # Solo permite inicializar el primer administrador si public.users está vacía.
+    # No concede acceso automático cuando ya existen usuarios autorizados.
     admin_emails: str = ""
     local_password_login_enabled: bool = False
+
+    # Keycloak permanece opcional para no interrumpir los accesos existentes de
+    # Google ni el login local de desarrollo. El flujo usa Authorization Code
+    # con PKCE; un cliente público no requiere ni debe exponer un secreto.
+    keycloak_enabled: bool = False
+    keycloak_url_internal: str = "http://keycloak:8080"
+    keycloak_url_public: str = "http://localhost:8081"
+    keycloak_realm: str = "labsentinel"
+    keycloak_client_id: str = "labsentinel-web"
+    keycloak_redirect_uri: str = "http://localhost:8080/api/auth/keycloak/callback"
+    keycloak_frontend_url: str = "http://localhost:8080/"
+    keycloak_state_cookie_name: str = "labsentinel_keycloak_state"
+    keycloak_verifier_cookie_name: str = "labsentinel_keycloak_verifier"
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -35,6 +50,14 @@ class Settings(BaseSettings):
             for email in self.admin_emails.split(",")
             if email.strip()
         }
+
+    @property
+    def keycloak_issuer(self) -> str:
+        return f"{self.keycloak_url_public.rstrip('/')}/realms/{self.keycloak_realm}"
+
+    @property
+    def keycloak_internal_realm_url(self) -> str:
+        return f"{self.keycloak_url_internal.rstrip('/')}/realms/{self.keycloak_realm}"
 
 
 @lru_cache

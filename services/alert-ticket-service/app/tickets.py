@@ -1,4 +1,5 @@
 import uuid
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -8,8 +9,15 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db import get_db
-from app.schemas import TicketCategory, TicketDetailResponse, TicketListResponse, TicketStatus
-from app.security import ROLE_ADMIN, require_ticket_author
+from app.schemas import (
+    TicketCategory,
+    TicketCommentCreate,
+    TicketDetailResponse,
+    TicketListResponse,
+    TicketStatus,
+    TicketStatusUpdate,
+)
+from app.security import ROLE_ADMIN, require_admin, require_ticket_author
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -46,6 +54,12 @@ TICKET_SELECT = """
     LEFT JOIN device_service.devices d ON d.id = t.device_id
     LEFT JOIN alert_ticket_service.ticket_attachments a ON a.ticket_id = t.id
 """
+
+NEXT_TICKET_STATUS = {
+    "abierto": "en_revision",
+    "en_revision": "resuelto",
+    "resuelto": "cerrado",
+}
 
 
 def to_ticket(row) -> dict:
@@ -199,6 +213,49 @@ def list_my_tickets(
     return {"items": [to_ticket(row) for row in rows], "total": total}
 
 
+@router.get("", response_model=TicketListResponse, summary="Listar tickets para gestión administrativa")
+def list_tickets(
+    status_filter: TicketStatus | None = Query(default=None, alias="status"),
+    device_id: uuid.UUID | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    search: str | None = Query(default=None, min_length=1, max_length=120),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> dict:
+    conditions: list[str] = []
+    params: dict = {"limit": limit, "offset": offset}
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="La fecha inicial no puede ser posterior a la fecha final")
+    if status_filter:
+        conditions.append("t.status = :status")
+        params["status"] = status_filter
+    if device_id:
+        conditions.append("t.device_id = :device_id")
+        params["device_id"] = device_id
+    if date_from:
+        conditions.append("t.created_at >= :date_from")
+        params["date_from"] = date_from
+    if date_to:
+        conditions.append("t.created_at < :date_to_exclusive")
+        params["date_to_exclusive"] = date_to + timedelta(days=1)
+    if search:
+        conditions.append(f"(d.name ILIKE :search OR d.device_code ILIKE :search OR t.description ILIKE :search OR {TICKET_CODE_SQL} ILIKE :search)")
+        params["search"] = f"%{search.strip()}%"
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = db.execute(
+        text(f"{TICKET_SELECT} {where} ORDER BY t.created_at DESC LIMIT :limit OFFSET :offset"),
+        params,
+    ).mappings().all()
+    total = db.execute(
+        text(f"SELECT COUNT(*) FROM alert_ticket_service.tickets t LEFT JOIN device_service.devices d ON d.id = t.device_id {where}"),
+        params,
+    ).scalar_one()
+    return {"items": [to_ticket(row) for row in rows], "total": total}
+
+
 @router.get("/{ticket_id}", response_model=TicketDetailResponse, summary="Consultar detalle de un ticket propio")
 def get_ticket(
     ticket_id: uuid.UUID,
@@ -208,18 +265,109 @@ def get_ticket(
     return read_ticket(ticket_id, db, claims)
 
 
+@router.patch("/{ticket_id}/status", response_model=TicketDetailResponse, summary="Actualizar estado de un ticket")
+def update_ticket_status(
+    ticket_id: uuid.UUID,
+    payload: TicketStatusUpdate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(require_admin),
+) -> dict:
+    ticket = db.execute(
+        text("SELECT status FROM alert_ticket_service.tickets WHERE id = :ticket_id FOR UPDATE"),
+        {"ticket_id": ticket_id},
+    ).mappings().one_or_none()
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado")
+    current_status = ticket["status"]
+    if payload.status != current_status and NEXT_TICKET_STATUS.get(current_status) != payload.status:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No se puede pasar de '{current_status}' a '{payload.status}'",
+        )
+    if payload.status != current_status:
+        db.execute(
+            text("""
+                UPDATE alert_ticket_service.tickets
+                SET status = :status,
+                    resolved_by_user_id = CASE WHEN :status = 'resuelto' THEN :user_id ELSE resolved_by_user_id END,
+                    resolved_at = CASE WHEN :status = 'resuelto' THEN NOW() ELSE resolved_at END,
+                    closed_by_user_id = CASE WHEN :status = 'cerrado' THEN :user_id ELSE closed_by_user_id END,
+                    closed_at = CASE WHEN :status = 'cerrado' THEN NOW() ELSE closed_at END,
+                    updated_at = NOW()
+                WHERE id = :ticket_id
+            """),
+            {"ticket_id": ticket_id, "status": payload.status, "user_id": claims["user_id"]},
+        )
+        db.execute(
+            text("""
+                INSERT INTO alert_ticket_service.ticket_status_history
+                    (ticket_id, previous_status, new_status, changed_by_user_id, note)
+                VALUES (:ticket_id, :previous_status, :new_status, :user_id, :note)
+            """),
+            {
+                "ticket_id": ticket_id,
+                "previous_status": current_status,
+                "new_status": payload.status,
+                "user_id": claims["user_id"],
+                "note": payload.note.strip() if payload.note else None,
+            },
+        )
+        db.commit()
+    return read_ticket(ticket_id, db, claims)
+
+
+@router.post("/{ticket_id}/comments", response_model=TicketDetailResponse, summary="Agregar comentario administrativo a un ticket")
+def create_ticket_comment(
+    ticket_id: uuid.UUID,
+    payload: TicketCommentCreate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(require_admin),
+) -> dict:
+    comment = payload.comment.strip()
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El comentario no puede estar vacío")
+    ticket = db.execute(
+        text("SELECT id FROM alert_ticket_service.tickets WHERE id = :ticket_id"),
+        {"ticket_id": ticket_id},
+    ).mappings().one_or_none()
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket no encontrado")
+    db.execute(
+        text("""
+            INSERT INTO alert_ticket_service.ticket_comments (ticket_id, author_user_id, comment)
+            VALUES (:ticket_id, :user_id, :comment)
+        """),
+        {"ticket_id": ticket_id, "user_id": claims["user_id"], "comment": comment},
+    )
+    db.commit()
+    return read_ticket(ticket_id, db, claims)
+
+
 def read_ticket(ticket_id: uuid.UUID, db: Session, claims: dict) -> dict:
     ticket = to_ticket(get_visible_ticket(ticket_id, claims, db))
     history = db.execute(
         text("""
-            SELECT previous_status, new_status, note, changed_at
-            FROM alert_ticket_service.ticket_status_history
+            SELECT h.previous_status, h.new_status, h.note, h.changed_at,
+                   h.changed_by_user_id, u.name AS changed_by_name
+            FROM alert_ticket_service.ticket_status_history h
+            LEFT JOIN public.users u ON u.id = h.changed_by_user_id
             WHERE ticket_id = :ticket_id
-            ORDER BY changed_at
+            ORDER BY h.changed_at
         """),
         {"ticket_id": ticket_id},
     ).mappings().all()
     ticket["history"] = [dict(row) for row in history]
+    comments = db.execute(
+        text("""
+            SELECT c.id, c.author_user_id, c.comment, c.created_at, u.name AS author_name
+            FROM alert_ticket_service.ticket_comments c
+            LEFT JOIN public.users u ON u.id = c.author_user_id
+            WHERE c.ticket_id = :ticket_id
+            ORDER BY c.created_at
+        """),
+        {"ticket_id": ticket_id},
+    ).mappings().all()
+    ticket["comments"] = [dict(row) for row in comments]
     return ticket
 
 

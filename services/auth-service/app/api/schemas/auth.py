@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+from typing import Literal
 
 
 class GoogleLoginRequest(BaseModel):
@@ -15,7 +16,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     name: str
-    google_id: str
+    google_id: str | None
     role: int
     picture_url: str | None = None
 
@@ -25,3 +26,13 @@ class UserResponse(BaseModel):
 class AuthMessageResponse(BaseModel):
     message: str
     user: UserResponse
+
+
+class UserInviteCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+    email: EmailStr
+    role: Literal[0, 1]
+
+
+class UserRoleUpdate(BaseModel):
+    role: Literal[0, 1]

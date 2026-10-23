@@ -1,7 +1,12 @@
-import React, { useState } from "react";
-import { Mail, Shield } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { KeyRound, Mail } from "lucide-react";
+import logoUrl from "../assets/labsentinel-mark.svg";
 import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
 import { loginWithPassword } from "../services/authApi.js";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const keycloakEnabled = import.meta.env.VITE_KEYCLOAK_ENABLED === "true";
+const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 const INSTITUTIONAL_EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -13,6 +18,15 @@ export function LoginPage({ onLoginSuccess }) {
   const [emailTouched, setEmailTouched] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const error = url.searchParams.get("auth_error");
+    if (!error) return;
+    setAuthError(error);
+    url.searchParams.delete("auth_error");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   const emailInvalid =
     (emailTouched || submitAttempted) &&
@@ -42,7 +56,7 @@ export function LoginPage({ onLoginSuccess }) {
       <section className="auth-card" aria-labelledby="login-title">
         <div className="auth-brand" aria-hidden="true">
           <div className="auth-brand-icon">
-            <Shield size={22} strokeWidth={2.2} />
+            <img src={logoUrl} alt="" />
           </div>
         </div>
 
@@ -116,14 +130,29 @@ export function LoginPage({ onLoginSuccess }) {
           </button>
         </form>
 
-        <div className="auth-divider" role="separator" aria-label="O continúa con">
-          <span>o</span>
-        </div>
+        {(googleEnabled || keycloakEnabled) && (
+          <div className="auth-divider" role="separator" aria-label="O continúa con">
+            <span>o continúa con</span>
+          </div>
+        )}
 
-        <GoogleSignInButton
-          onSuccess={onLoginSuccess}
-          onError={setAuthError}
-        />
+        {googleEnabled && (
+          <GoogleSignInButton
+            onSuccess={onLoginSuccess}
+            onError={setAuthError}
+          />
+        )}
+
+        {keycloakEnabled && (
+          <button
+            type="button"
+            className="auth-keycloak-button"
+            onClick={() => window.location.assign(`${apiBaseUrl}/auth/keycloak/login`)}
+          >
+            <KeyRound size={17} aria-hidden="true" />
+            Ingresar con Keycloak
+          </button>
+        )}
       </section>
 
       <footer className="auth-footer">

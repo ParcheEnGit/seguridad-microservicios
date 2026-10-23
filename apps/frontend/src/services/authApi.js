@@ -74,3 +74,40 @@ export async function logout() {
 
   return parseJsonResponse(response);
 }
+
+export async function listAuthorizedUsers() {
+  const response = await fetch(`${API_BASE_URL}/auth/users`, {
+    method: "GET",
+    credentials: "include",
+  });
+  return parseJsonResponse(response);
+}
+
+export async function authorizeUser({ name, email, role }) {
+  const response = await fetch(`${API_BASE_URL}/auth/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email, role }),
+  });
+  return parseJsonResponse(response);
+}
+
+export async function revokeUser(userId) {
+  const response = await fetch(`${API_BASE_URL}/auth/users/${userId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 204) return;
+  return parseJsonResponse(response);
+}
+
+export async function updateUserRole(userId, role) {
+  const response = await fetch(`${API_BASE_URL}/auth/users/${userId}/role`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  return parseJsonResponse(response);
+}

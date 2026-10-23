@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, ChevronRight, Eye, FileText, Paperclip, Plus, Search, Ticket, UploadCloud, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Eye, FileText, MessageSquare, Paperclip, Plus, Search, Send, Ticket, UploadCloud, X } from "lucide-react";
 
 import {
   TICKET_ATTACHMENT_MAX_BYTES,
@@ -12,10 +12,24 @@ import {
   getStatusLabel,
 } from "../constants/tickets.js";
 import { listDevices } from "../services/deviceApi.js";
-import { createTicket, getTicket, listMyTickets } from "../services/ticketApi.js";
+import { isAdmin } from "../constants/roles.js";
+import { createTicket, createTicketComment, getTicket, listMyTickets, listTickets, updateTicketStatus } from "../services/ticketApi.js";
 
 const REDIRECT_DELAY_MS = 3000;
 const EMPTY_FORM = { deviceId: "", category: "", description: "" };
+
+function getBoliviaToday() {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+const TODAY = getBoliviaToday();
 
 function formatDate(timestamp, withTime = false) {
   return new Intl.DateTimeFormat("es-BO", {
@@ -224,13 +238,52 @@ function TicketForm({ onCancel, onCreated, onView }) {
   );
 }
 
-function TicketDetailModal({ ticketId, onClose }) {
+const NEXT_STATUS = { abierto: "en_revision", en_revision: "resuelto", resuelto: "cerrado" };
+
+function TicketDetailModal({ ticketId, onClose, admin, onUpdated }) {
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [comment, setComment] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
 
   useEffect(() => {
     getTicket(ticketId).then(setTicket).catch((requestError) => setError(requestError.message));
   }, [ticketId]);
+
+  async function advanceStatus() {
+    const nextStatus = NEXT_STATUS[ticket?.status];
+    if (!nextStatus) return;
+    setSavingStatus(true);
+    setError("");
+    try {
+      const updated = await updateTicketStatus(ticket.id, nextStatus);
+      setTicket(updated);
+      onUpdated();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  async function addComment(event) {
+    event.preventDefault();
+    const content = comment.trim();
+    if (!content || !ticket) return;
+    setSavingComment(true);
+    setError("");
+    try {
+      const updated = await createTicketComment(ticket.id, content);
+      setTicket(updated);
+      setComment("");
+      onUpdated();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingComment(false);
+    }
+  }
 
   return (
     <div className="device-modal-backdrop" role="presentation" onClick={onClose}>
@@ -274,9 +327,35 @@ function TicketDetailModal({ ticketId, onClose }) {
                       <small>{formatDate(change.changed_at, true)}</small>
                     </div>
                     {change.note && <p className="ticket-history__note">{change.note}</p>}
+                    {change.changed_by_name && <small className="ticket-history__author">Por {change.changed_by_name}</small>}
                   </li>
                 ))}
               </ol>
+              <h2>Comentarios</h2>
+              {ticket.comments?.length > 0 ? (
+                <ol className="ticket-comments">
+                  {ticket.comments.map((item) => (
+                    <li key={item.id}>
+                      <div><MessageSquare size={15} aria-hidden="true" /><strong>{item.author_name ?? "Administrador"}</strong><small>{formatDate(item.created_at, true)}</small></div>
+                      <p>{item.comment}</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="device-muted">Aún no hay comentarios administrativos.</p>}
+              {admin && (
+                <form className="ticket-comment-form" onSubmit={addComment}>
+                  <label htmlFor="ticket-admin-comment">Añadir comentario</label>
+                  <textarea id="ticket-admin-comment" rows={3} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Registra una actualización o instrucción para el seguimiento..." />
+                  <div><small>{comment.trim().length}/1000</small><button type="submit" className="ticket-outline-btn" disabled={savingComment || !comment.trim()}>{savingComment ? "Guardando..." : <><Send size={15} /> Guardar comentario</>}</button></div>
+                </form>
+              )}
+              {admin && NEXT_STATUS[ticket.status] && (
+                <div className="device-form-actions">
+                  <button type="button" className="device-primary-btn" disabled={savingStatus} onClick={advanceStatus}>
+                    {savingStatus ? "Actualizando..." : `Marcar como ${getStatusLabel(NEXT_STATUS[ticket.status])}`}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -285,20 +364,33 @@ function TicketDetailModal({ ticketId, onClose }) {
   );
 }
 
-function TicketList({ onCreate, onView }) {
+function TicketList({ onCreate, onView, admin, refreshKey }) {
   const [tickets, setTickets] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [deviceFilter, setDeviceFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const filtered = Boolean(search.trim() || statusFilter);
+  const filtered = Boolean(search.trim() || statusFilter || deviceFilter || dateFrom || dateTo);
+
+  useEffect(() => {
+    if (!admin) return undefined;
+    let active = true;
+    listDevices({ limit: 100 }).then((data) => active && setDevices(data.items ?? [])).catch(() => active && setDevices([]));
+    return () => { active = false; };
+  }, [admin]);
 
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const data = await listMyTickets({ search: search.trim(), status: statusFilter, limit: 100 });
+      const filters = { search: search.trim(), status: statusFilter, limit: 100 };
+      if (admin) Object.assign(filters, { device_id: deviceFilter, date_from: dateFrom, date_to: dateTo });
+      const data = await (admin ? listTickets : listMyTickets)(filters);
       setTickets(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (requestError) {
@@ -311,21 +403,29 @@ function TicketList({ onCreate, onView }) {
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, deviceFilter, dateFrom, dateTo, admin, refreshKey]);
 
   return (
     <section className="tickets-page">
       <header className="devices-header">
-        <div><h1>Mis tickets</h1><p>{total} ticket{total === 1 ? "" : "s"} {filtered ? "encontrado" : "enviado"}{total === 1 ? "" : "s"}</p></div>
+        <div><h1>{admin ? "Gestión de tickets" : "Mis tickets"}</h1><p>{total} ticket{total === 1 ? "" : "s"} {filtered ? "encontrado" : admin ? "registrado" : "enviado"}{total === 1 ? "" : "s"}</p></div>
         <button type="button" className="ticket-outline-btn ticket-create-btn" onClick={onCreate}><Plus size={17} /> Reportar condición</button>
       </header>
 
-      <section className="ticket-filter-bar" aria-label="Filtros de tickets">
+      <section className={`ticket-filter-bar${admin ? " ticket-filter-bar--admin" : ""}`} aria-label="Filtros de tickets">
         <label className="device-search"><Search size={17} aria-hidden="true" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar ticket..." /></label>
         <select aria-label="Filtrar por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
           <option value="">Todos los estados</option>
           {TICKET_STATUSES.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
         </select>
+        {admin && <>
+          <select aria-label="Filtrar por dispositivo" value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)}>
+            <option value="">Todos los dispositivos</option>
+            {devices.map((device) => <option key={device.id} value={device.id}>{device.name}</option>)}
+          </select>
+          <label className="ticket-date-filter"><span>Desde</span><input type="date" value={dateFrom} max={dateTo || TODAY} onChange={(event) => setDateFrom(event.target.value > TODAY ? TODAY : event.target.value)} /></label>
+          <label className="ticket-date-filter"><span>Hasta</span><input type="date" value={dateTo} min={dateFrom || undefined} max={TODAY} onChange={(event) => setDateTo(event.target.value > TODAY ? TODAY : event.target.value)} /></label>
+        </>}
       </section>
 
       {error && (
@@ -339,7 +439,7 @@ function TicketList({ onCreate, onView }) {
         {loading ? <p className="device-muted">Cargando tickets...</p> : tickets.length === 0 ? (
           <div className="device-empty">
             <Ticket size={28} />
-            <p>{filtered ? "No se encontraron tickets con esos filtros." : "Aún no registraste tickets."}</p>
+            <p>{filtered ? "No se encontraron tickets con esos filtros." : admin ? "No hay tickets registrados." : "Aún no registraste tickets."}</p>
             {!filtered && <button type="button" className="device-link-btn" onClick={onCreate}>Reportar una condición</button>}
           </div>
         ) : (
@@ -379,16 +479,18 @@ function TicketList({ onCreate, onView }) {
   );
 }
 
-export function TicketsPage({ initialView = "list" }) {
+export function TicketsPage({ initialView = "list", user }) {
   const [view, setView] = useState(initialView);
   const [selectedId, setSelectedId] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const admin = isAdmin(user?.role);
 
   return (
     <>
       {view === "create"
         ? <TicketForm onCancel={() => setView("list")} onCreated={() => setView("list")} onView={(ticket) => { setView("list"); setSelectedId(ticket.id); }} />
-        : <TicketList onCreate={() => setView("create")} onView={(ticket) => setSelectedId(ticket.id)} />}
-      {selectedId && <TicketDetailModal ticketId={selectedId} onClose={() => setSelectedId(null)} />}
+        : <TicketList admin={admin} refreshKey={refreshKey} onCreate={() => setView("create")} onView={(ticket) => setSelectedId(ticket.id)} />}
+      {selectedId && <TicketDetailModal ticketId={selectedId} admin={admin} onUpdated={() => setRefreshKey((key) => key + 1)} onClose={() => setSelectedId(null)} />}
     </>
   );
 }

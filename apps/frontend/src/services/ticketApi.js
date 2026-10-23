@@ -21,7 +21,32 @@ export function listMyTickets(filters = {}) {
   return request(`/tickets/mine${query ? `?${query}` : ""}`);
 }
 
+export function listTickets(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") params.set(key, value);
+  });
+  const query = params.toString();
+  return request(`/tickets${query ? `?${query}` : ""}`);
+}
+
 export const getTicket = (id) => request(`/tickets/${id}`);
+
+export function updateTicketStatus(id, status, note = "") {
+  return request(`/tickets/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, note: note || undefined }),
+  });
+}
+
+export function createTicketComment(id, comment) {
+  return request(`/tickets/${id}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comment }),
+  });
+}
 
 export function createTicket({ deviceId, category, description, attachment }) {
   const formData = new FormData();
