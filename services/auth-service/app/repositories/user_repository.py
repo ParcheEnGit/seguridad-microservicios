@@ -16,6 +16,10 @@ class UserRepository:
         statement = select(User).where(User.google_id == google_id)
         return self.db.scalar(statement)
 
+    def get_by_keycloak_id(self, keycloak_id: str) -> User | None:
+        statement = select(User).where(User.keycloak_id == keycloak_id)
+        return self.db.scalar(statement)
+
     def get_by_email(self, email: str) -> User | None:
         statement = select(User).where(User.email == email.lower())
         return self.db.scalar(statement)
@@ -27,9 +31,11 @@ class UserRepository:
         name: str,
         role: int,
         picture_url: str | None = None,
+        keycloak_id: str | None = None,
     ) -> User:
         user = User(
             google_id=google_id,
+            keycloak_id=keycloak_id,
             email=email,
             name=name,
             role=role,
@@ -136,3 +142,38 @@ class UserRepository:
             )
 
         raise PermissionError("El correo no está autorizado por un administrador de LabSentinel")
+
+    def get_or_create_from_keycloak(
+        self,
+        *,
+        keycloak_id: str,
+        email: str,
+        name: str,
+        role: int,
+        picture_url: str | None = None,
+    ) -> User:
+        """Sincroniza una identidad OIDC previamente verificada.
+
+        Keycloak es la fuente de rol únicamente para accesos Keycloak. Las
+        identidades se enlazan por `sub` y nunca se sustituyen silenciosamente
+        si un correo ya pertenece a otro sujeto de Keycloak.
+        """
+        existing = self.get_by_keycloak_id(keycloak_id)
+        if existing:
+            return self.update_profile(existing, name=name, role=role, picture_url=picture_url)
+
+        by_email = self.get_by_email(email)
+        if by_email:
+            if by_email.keycloak_id and by_email.keycloak_id != keycloak_id:
+                raise PermissionError("El correo ya está vinculado a otra identidad de Keycloak")
+            by_email.keycloak_id = keycloak_id
+            return self.update_profile(by_email, name=name, role=role, picture_url=picture_url)
+
+        return self.create(
+            google_id=None,
+            keycloak_id=keycloak_id,
+            email=email,
+            name=name,
+            role=role,
+            picture_url=picture_url,
+        )
