@@ -21,3 +21,6 @@ def apply_migrations(engine: Engine) -> None:
             )
         if "google_id" in columns:
             connection.execute(text("ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL"))
+        if "keycloak_id" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN keycloak_id VARCHAR(255)"))
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_keycloak_id ON users(keycloak_id)"))

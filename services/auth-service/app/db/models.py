@@ -12,6 +12,7 @@ class User(Base):
     # Es nulo mientras un administrador autoriza el correo y el usuario aún no
     # inicia sesión por primera vez con Google.
     google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    keycloak_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     picture_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
