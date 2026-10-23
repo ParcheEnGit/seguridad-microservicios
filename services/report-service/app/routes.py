@@ -39,6 +39,24 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 RECENT_ALERTS_LIMIT = 3
 
+
+# HU11: Validar fechas de los reportes administrativos.
+def validate_report_dates(start_date: date, end_date: date) -> None:
+    today = datetime.now(timezone.utc).date()
+
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
+    if start_date > today or end_date > today:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se permiten fechas futuras en los reportes",
+        )
+
+
 DEVICE_COUNTS_SQL = text("""
     SELECT COUNT(*)                                         AS total,
            COUNT(*) FILTER (WHERE status = 'activo')        AS activo,
@@ -191,11 +209,7 @@ def devices_report(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ) -> DeviceReportResponse:
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="La fecha inicial no puede ser posterior a la fecha final",
-        )
+    validate_report_dates(start_date, end_date)
 
     if device_status not in (None, "activo", "inactivo", "mantenimiento"):
         raise HTTPException(
@@ -256,11 +270,7 @@ def alerts_report(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ) -> AlertReportResponse:
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="La fecha inicial no puede ser posterior a la fecha final",
-        )
+    validate_report_dates(start_date, end_date)
 
     if severity not in (None, "advertencia", "critica"):
         raise HTTPException(
@@ -333,11 +343,7 @@ def tickets_report(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ) -> TicketReportResponse:
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="La fecha inicial no puede ser posterior a la fecha final",
-        )
+    validate_report_dates(start_date, end_date)
 
     if ticket_status not in (
         None,
