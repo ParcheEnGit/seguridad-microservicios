@@ -24,6 +24,7 @@ import { AlertsPage } from "./AlertsPage.jsx";
 import { TicketsPage } from "./TicketsPage.jsx";
 import { TelemetryPage } from "./TelemetryPage.jsx";
 import { UsersPage } from "./UsersPage.jsx";
+import { ReportsPage } from "./ReportsPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -133,6 +134,8 @@ export function DashboardPage({ user, onLogout }) {
         <TelemetryPage />
       ) : activeItem === "usuarios" && isAdmin(user.role) ? (
         <UsersPage />
+      ) : activeItem === "reportes" && isAdmin(user.role) ? (
+        <ReportsPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (
