@@ -48,11 +48,13 @@ export function createTicketComment(id, comment) {
   });
 }
 
-export function createTicket({ deviceId, category, description, attachment }) {
+export function createTicket({ deviceId, category, description, attachment, priority = "no_critica", alertId }) {
   const formData = new FormData();
   formData.append("device_id", deviceId);
   formData.append("category", category);
   formData.append("description", description);
+  formData.append("priority", priority);
+  if (alertId) formData.append("alert_id", alertId);
   if (attachment) formData.append("attachment", attachment);
   return request("/tickets", { method: "POST", body: formData });
 }

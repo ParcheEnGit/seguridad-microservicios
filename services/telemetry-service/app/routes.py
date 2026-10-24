@@ -144,22 +144,19 @@ def classify_threshold_breach(
     min_value: Decimal,
     max_value: Decimal,
 ) -> tuple[str, str] | None:
-    allowed_range = max_value - min_value
     if value < min_value:
-        condition = "below_min"
-        deviation = min_value - value
-    elif value > max_value:
-        condition = "above_max"
-        deviation = value - max_value
-    else:
-        return None
+        return "below_min", "critica"
+    if value > max_value:
+        return "above_max", "critica"
 
-    severity = (
-        "critica"
-        if deviation >= allowed_range * Decimal("0.10")
-        else "advertencia"
-    )
-    return condition, severity
+    distance_to_min = value - min_value
+    distance_to_max = max_value - value
+    warning_distance = Decimal("3")
+    if distance_to_min <= warning_distance and distance_to_min <= distance_to_max:
+        return "near_min", "advertencia"
+    if distance_to_max <= warning_distance:
+        return "near_max", "advertencia"
+    return None
 
 
 @router.post(
@@ -207,7 +204,9 @@ def create_reading(
     condition = None
     severity = None
     notify_alert = False
+    out_of_range = False
     if threshold is not None:
+        out_of_range = payload.value < threshold["min_value"] or payload.value > threshold["max_value"]
         anomaly = classify_threshold_breach(
             payload.value,
             threshold["min_value"],
@@ -295,7 +294,7 @@ def create_reading(
         )
     return {
         **dict(row),
-        "out_of_range": condition is not None,
+        "out_of_range": out_of_range,
         "condition": condition,
         "severity": severity,
         "alert_id": alert_id,

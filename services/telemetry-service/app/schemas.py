@@ -38,7 +38,7 @@ class TelemetryReadingResponse(BaseModel):
 
 class TelemetryReadingIngestResponse(TelemetryReadingResponse):
     out_of_range: bool = False
-    condition: Literal["below_min", "above_max"] | None = None
+    condition: Literal["below_min", "above_max", "near_min", "near_max"] | None = None
     severity: Literal["advertencia", "critica"] | None = None
     alert_id: UUID | None = None
     alert_created: bool = False

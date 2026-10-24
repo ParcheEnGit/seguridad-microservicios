@@ -48,6 +48,12 @@ function StatusBadge({ status }) {
   return <span className={`ticket-status ticket-status--${status}`}>{getStatusLabel(status)}</span>;
 }
 
+function getPriorityLabel(priority) {
+  if (priority === "critica") return "Crítica";
+  if (priority === "advertencia") return "Advertencia";
+  return "No crítica";
+}
+
 function validateAttachment(file) {
   if (!TICKET_ATTACHMENT_TYPES.includes(file.type)) return "El adjunto debe ser PDF, PNG o JPG.";
   if (file.size > TICKET_ATTACHMENT_MAX_BYTES) return "El adjunto no debe superar 5 MB.";
@@ -303,7 +309,7 @@ function TicketDetailModal({ ticketId, onClose, admin, onUpdated }) {
               <dl className="ticket-detail__grid">
                 <div><dt>Estado</dt><dd><StatusBadge status={ticket.status} /></dd></div>
                 <div><dt>Categoría</dt><dd>{getCategoryLabel(ticket.category)}</dd></div>
-                <div><dt>Prioridad</dt><dd>No crítica</dd></div>
+                <div><dt>Prioridad</dt><dd>{getPriorityLabel(ticket.priority)}</dd></div>
                 <div><dt>Registrado</dt><dd>{formatDate(ticket.created_at, true)}</dd></div>
               </dl>
               <h2>Descripción</h2>

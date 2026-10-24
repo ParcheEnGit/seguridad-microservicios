@@ -14,6 +14,7 @@ from app.schemas import (
     TicketCommentCreate,
     TicketDetailResponse,
     TicketListResponse,
+    TicketPriority,
     TicketStatus,
     TicketStatusUpdate,
 )
@@ -42,6 +43,7 @@ TICKET_SELECT = """
         d.device_code,
         t.category,
         t.description,
+        t.priority,
         t.status,
         t.created_by_user_id,
         t.created_at,
@@ -71,6 +73,7 @@ def to_ticket(row) -> dict:
         "device_code": row["device_code"],
         "category": row["category"],
         "description": row["description"],
+        "priority": row["priority"],
         "status": row["status"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -100,11 +103,13 @@ def is_valid_attachment(content_type: str, content: bytes) -> bool:
     return expected is not None and content.startswith(expected[1])
 
 
-@router.post("", response_model=TicketDetailResponse, status_code=status.HTTP_201_CREATED, summary="Registrar ticket no crítico")
+@router.post("", response_model=TicketDetailResponse, status_code=status.HTTP_201_CREATED, summary="Registrar ticket")
 async def create_ticket(
     device_id: uuid.UUID = Form(...),
     category: TicketCategory = Form(...),
     description: str = Form(..., max_length=MAX_DESCRIPTION_LENGTH),
+    priority: TicketPriority = Form(default="no_critica"),
+    alert_id: uuid.UUID | None = Form(default=None),
     attachment: UploadFile | None = File(default=None, description="PDF, PNG o JPG de hasta 5 MB"),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -131,15 +136,39 @@ async def create_ticket(
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
 
+    if alert_id is not None:
+        alert = db.execute(
+            text("""
+                SELECT device_id, severity
+                FROM alert_ticket_service.alerts
+                WHERE id = :alert_id
+            """),
+            {"alert_id": alert_id},
+        ).mappings().one_or_none()
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
+        if alert["device_id"] != device_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La alerta no corresponde al dispositivo seleccionado",
+            )
+        priority = alert["severity"]
+
     file_path = None
     try:
         ticket_id = db.execute(
             text("""
-                INSERT INTO alert_ticket_service.tickets (device_id, created_by_user_id, category, description)
-                VALUES (:device_id, :user_id, :category, :description)
+                INSERT INTO alert_ticket_service.tickets (device_id, created_by_user_id, category, description, priority)
+                VALUES (:device_id, :user_id, :category, :description, :priority)
                 RETURNING id
             """),
-            {"device_id": device_id, "user_id": claims["user_id"], "category": category, "description": description},
+            {
+                "device_id": device_id,
+                "user_id": claims["user_id"],
+                "category": category,
+                "description": description,
+                "priority": priority,
+            },
         ).scalar_one()
         db.execute(
             text("""
