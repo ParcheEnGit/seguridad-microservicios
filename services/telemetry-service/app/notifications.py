@@ -56,11 +56,16 @@ def send_alert_email(
     device = device_name or device_code or "Dispositivo sin nombre"
     if device_code and device_code != device:
         device = f"{device} ({device_code})"
-    direction = "superó el máximo" if condition == "above_max" else "bajó del mínimo"
+    direction = {
+        "below_min": "bajó del mínimo",
+        "above_max": "superó el máximo",
+        "near_min": "cerca del mínimo",
+        "near_max": "cerca del máximo",
+    }[condition]
     event_label = {
         "pico_forzado": "pico forzado de demostración",
         "pico_aleatorio": "pico aleatorio del simulador",
-    }.get(event or "", "lectura fuera de umbral")
+    }.get(event or "", "lectura fuera del rango" if condition in ("below_min", "above_max") else "lectura cerca del umbral")
 
     content = (
         "LabSentinel detectó una condición anómala.\n\n"

@@ -83,6 +83,10 @@ def test_categoria_invalida_responde_422():
     assert lector().post("/tickets", data={**VALID_FORM, "category": "explosion"}).status_code == 422
 
 
+def test_prioridad_invalida_responde_422():
+    assert lector().post("/tickets", data={**VALID_FORM, "priority": "urgente"}).status_code == 422
+
+
 def test_descripcion_corta_responde_422():
     response = lector().post("/tickets", data={**VALID_FORM, "description": "   corta   "})
     assert response.status_code == 422
