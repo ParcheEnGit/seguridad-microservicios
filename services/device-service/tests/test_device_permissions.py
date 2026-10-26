@@ -29,7 +29,7 @@ CREATE_PAYLOAD = {
     "location": "Lab A",
     "status": "activo",
     "thresholds": [
-        {"metric_code": "temperatura", "unit": "c", "min_value": 18, "max_value": 28},
+        {"metric_code": "temperatura", "unit": "°C", "min_value": 18, "max_value": 28},
     ],
 }
 

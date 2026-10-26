@@ -1,5 +1,36 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+const FIELD_LABELS = {
+  device_code: "Código único",
+  name: "Nombre del dispositivo",
+  device_type: "Tipo de dispositivo",
+  location: "Laboratorio o ubicación",
+  metric_code: "Métrica",
+  unit: "Unidad",
+  min_value: "Mínimo",
+  max_value: "Máximo",
+};
+
+function formatValidationError(detail) {
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return "No se pudo completar la operación.";
+  return detail.map((issue) => {
+    const location = Array.isArray(issue.loc) ? issue.loc : [];
+    const thresholdPosition = location.indexOf("thresholds");
+    const threshold = thresholdPosition >= 0 && Number.isInteger(location[thresholdPosition + 1])
+      ? `Umbral ${location[thresholdPosition + 1] + 1}`
+      : "";
+    const field = FIELD_LABELS[location.at(-1)] ?? "Dato";
+    return `${[threshold, field].filter(Boolean).join(" · ")}: ${issue.msg ?? "valor no válido"}.`;
+  }).join(" ");
+}
+
+function requestError(response, detail, fallback) {
+  const error = new Error(formatValidationError(detail) || fallback);
+  error.status = response.status;
+  return error;
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}/devices${path}`, {
     credentials: "include",
@@ -7,7 +38,7 @@ async function request(path, options = {}) {
     ...options,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail ?? "No se pudo completar la operación.");
+  if (!response.ok) throw requestError(response, data.detail, "No se pudo completar la operación.");
   return data;
 }
 
@@ -33,7 +64,7 @@ export async function uploadDevicePhoto(id, photo) {
     body: formData,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail ?? "No se pudo subir la fotografía.");
+  if (!response.ok) throw requestError(response, data.detail, "No se pudo subir la fotografía.");
   return data;
 }
 
@@ -44,6 +75,6 @@ export async function deleteDevicePhoto(deviceId, photoId) {
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail ?? "No se pudo eliminar la fotografía.");
+    throw requestError(response, data.detail, "No se pudo eliminar la fotografía.");
   }
 }

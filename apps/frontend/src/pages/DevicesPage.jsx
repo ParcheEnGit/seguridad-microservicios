@@ -7,7 +7,26 @@ import { fetchAlerts } from "../services/dashboardApi.js";
 const PAGE_SIZE = 10;
 const EMPTY_DEVICE = { device_code: "", name: "", device_type: "", location: "", status: "activo" };
 const EMPTY_THRESHOLD = { metric_code: "temperatura", unit: "°C", min_value: "", max_value: "" };
+const METRIC_UNITS = {
+  temperatura: ["°C", "°F"],
+  humedad: ["%"],
+  co2: ["ppm"],
+  calidad_aire: ["ppm"],
+  presion: ["Pa", "hPa", "kPa"],
+  voltaje: ["mV", "V"],
+  corriente: ["mA", "A"],
+  potencia: ["W", "kW"],
+  iluminacion: ["lx"],
+};
 let thresholdSequence = 0;
+
+const metricKey = (value) => value.trim().toLowerCase();
+const unitOptions = (metricCode) => METRIC_UNITS[metricKey(metricCode)] ?? [];
+
+function normalizedUnit(metricCode, unit) {
+  const options = unitOptions(metricCode);
+  return options.includes(unit) ? unit : (options[0] ?? "");
+}
 
 // La clave permanece igual mientras se escribe: no usar metric_code como key,
 // pues cambia con cada tecla y React recreaba el campo perdiendo el foco.
@@ -43,7 +62,11 @@ function DeviceFormModal({ device, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const editing = Boolean(device);
   const change = (field, value) => setForm((current) => ({ ...current, [field]: value }));
-  const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => {
+    if (itemIndex !== index) return item;
+    if (field !== "metric_code") return { ...item, [field]: value };
+    return { ...item, metric_code: value, unit: normalizedUnit(value, item.unit) };
+  }));
 
   function addPhotos(event) {
     const selectedPhotos = Array.from(event.target.files ?? []);
@@ -93,7 +116,7 @@ function DeviceFormModal({ device, onClose, onSaved }) {
         <label className="device-photo-upload__button"><ImagePlus size={17} /> Añadir fotografías<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addPhotos} /></label>
         {photos.length > 0 && <div className="device-photo-preview">{photos.map((photo, index) => <PendingPhotoPreview key={`${photo.name}-${index}`} photo={photo} index={index} onRemove={(photoIndex) => setPhotos((current) => current.filter((_, indexToCheck) => indexToCheck !== photoIndex))} />)}</div>}
       </section>}
-      {!editing && <section className="device-initial-thresholds"><label className="device-initial-thresholds__toggle"><input type="checkbox" checked={includeThresholds} onChange={(event) => setIncludeThresholds(event.target.checked)} /><span><strong>Configurar umbrales ahora</strong><small>Opcional. Puedes definir los rangos de monitoreo antes de registrar el dispositivo.</small></span></label>{includeThresholds && <div className="device-threshold-grid">{thresholds.map((threshold, index) => <div className="device-threshold-card" key={threshold._key}><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong>{thresholds.length > 1 && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button>}</div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => updateThreshold(index, "metric_code", event.target.value)} placeholder="temperatura" /></label><label>Unidad<input required value={threshold.unit} onChange={(event) => updateThreshold(index, "unit", event.target.value)} placeholder="°C" /></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => updateThreshold(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => updateThreshold(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>)}<button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, createThreshold()])}><Plus size={16} /> Añadir otra métrica</button></div>}</section>}
+      {!editing && <section className="device-initial-thresholds"><label className="device-initial-thresholds__toggle"><input type="checkbox" checked={includeThresholds} onChange={(event) => setIncludeThresholds(event.target.checked)} /><span><strong>Configurar umbrales ahora</strong><small>Opcional. Puedes definir los rangos de monitoreo antes de registrar el dispositivo.</small></span></label>{includeThresholds && <div className="device-threshold-grid">{thresholds.map((threshold, index) => <ThresholdFields key={threshold._key} threshold={threshold} index={index} removable={thresholds.length > 1} onChange={updateThreshold} onRemove={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}<button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, createThreshold()])}><Plus size={16} /> Añadir otra métrica</button></div>}</section>}
       <div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : editing ? "Guardar cambios" : "Registrar dispositivo"}</button></div>
     </form>
   </Modal>;
@@ -103,7 +126,11 @@ function ThresholdModal({ device, onClose, onSaved }) {
   const [thresholds, setThresholds] = useState(() => device.thresholds.map((item) => createThreshold({ ...item, min_value: String(item.min_value), max_value: String(item.max_value) })));
   const [notify, setNotify] = useState(device.metadata?.notify_on_threshold_breach ?? true);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
-  const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => {
+    if (itemIndex !== index) return item;
+    if (field !== "metric_code") return { ...item, [field]: value };
+    return { ...item, metric_code: value, unit: normalizedUnit(value, item.unit) };
+  }));
 
   async function submit(event) {
     event.preventDefault(); setError("");
@@ -113,7 +140,14 @@ function ThresholdModal({ device, onClose, onSaved }) {
     try { await replaceThresholds(device.id, payload); await updateDevice(device.id, { metadata: { ...device.metadata, notify_on_threshold_breach: notify } }); await onSaved(); } catch (requestError) { setError(requestError.message); } finally { setSaving(false); }
   }
 
-  return <Modal title={`Configurar umbrales — ${device.name}`} subtitle="Define los rangos permitidos para cada métrica del dispositivo." onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-threshold-grid">{thresholds.map((threshold, index) => <div className="device-threshold-card" key={threshold._key}><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong><button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={16} /></button></div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => updateThreshold(index, "metric_code", event.target.value)} placeholder="temperatura" /></label><label>Unidad<input required value={threshold.unit} onChange={(event) => updateThreshold(index, "unit", event.target.value)} placeholder="°C" /></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => updateThreshold(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => updateThreshold(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>)}</div><button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, createThreshold()])}><Plus size={16} /> Añadir métrica</button><label className="device-notification-toggle"><span><strong>Notificar al superar umbral</strong><small>Se enviará una alerta cuando una lectura salga del rango.</small></span><input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} /></label><div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button></div></form></Modal>;
+  return <Modal title={`Configurar umbrales — ${device.name}`} subtitle="Define los rangos permitidos para cada métrica del dispositivo." onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-threshold-grid">{thresholds.map((threshold, index) => <ThresholdFields key={threshold._key} threshold={threshold} index={index} removable onChange={updateThreshold} onRemove={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}</div><button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, createThreshold()])}><Plus size={16} /> Añadir métrica</button><label className="device-notification-toggle"><span><strong>Notificar al superar umbral</strong><small>Se enviará una alerta cuando una lectura salga del rango.</small></span><input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} /></label><div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button></div></form></Modal>;
+}
+
+function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
+  const options = unitOptions(threshold.metric_code);
+  const selectedUnit = normalizedUnit(threshold.metric_code, threshold.unit);
+  const metricListId = `supported-threshold-metrics-${threshold._key}`;
+  return <div className="device-threshold-card"><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong>{removable && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={onRemove}><X size={16} /></button>}</div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => onChange(index, "metric_code", event.target.value)} placeholder="temperatura" list={metricListId} /><datalist id={metricListId}>{Object.keys(METRIC_UNITS).map((metric) => <option key={metric} value={metric} />)}</datalist></label><label>Unidad<select required value={selectedUnit} disabled={!options.length} onChange={(event) => onChange(index, "unit", event.target.value)}><option value="">{options.length ? "Selecciona una unidad" : "Selecciona una métrica válida"}</option>{options.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => onChange(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => onChange(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>;
 }
 
 function DevicePhotoGallery({ photos, deviceName }) {

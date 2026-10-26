@@ -2,10 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { BarChart3, Bell, ChevronRight, Plus, RefreshCw, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { getAdminSummary } from "../../services/reportApi.js";
 import { listDevices, replaceThresholds } from "../../services/deviceApi.js";
+import { TELEMETRY_REFRESH_MS } from "../../constants/telemetry.js";
 import { LineChart24h, SERIES } from "./LineChart24h.jsx";
 import { DeviceTelemetryChart } from "./DeviceTelemetryChart.jsx";
-
-const REFRESH_MS = 15 * 1000;
 
 const METRIC_NAMES = { temperatura: "Temperatura", humedad: "Humedad" };
 
@@ -154,7 +153,7 @@ export function AdminDashboard({ onNavigate }) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, TELEMETRY_REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, LoaderCircle, Maximize2, Minimize2 } from "lucide-react";
+import { TELEMETRY_REFRESH_MS } from "../../constants/telemetry.js";
 import { getDeviceTelemetry } from "../../services/reportApi.js";
 
 const WIDTH = 900;
@@ -10,6 +11,8 @@ const PERIODS = [["1h", "1 h"], ["6h", "6 h"], ["24h", "24 h"], ["7d", "7 días"
 const RESOLUTIONS = [["15s", "15 s"], ["1m", "1 min"], ["5m", "5 min"], ["15m", "15 min"], ["1h", "1 h"], ["1d", "1 día"]];
 const METRICS = { temperatura: "Temperatura (°C)", humedad: "Humedad (%)" };
 const PERIOD_MS = { "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000, "30d": 2592000000 };
+const RESOLUTION_MS = { "15s": 15000, "1m": 60000, "5m": 300000, "15m": 900000, "1h": 3600000, "1d": 86400000 };
+const MIN_RECENT_WINDOW_MS = 10 * 60 * 1000;
 
 const formatTime = (value, period) => new Date(value).toLocaleString(
   "es-BO",
@@ -17,6 +20,26 @@ const formatTime = (value, period) => new Date(value).toLocaleString(
     ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }
     : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
 );
+
+const formatCoverage = (milliseconds) => {
+  if (milliseconds < 60 * 60 * 1000) return `${Math.max(1, Math.round(milliseconds / 60000))} min`;
+  if (milliseconds < 24 * 60 * 60 * 1000) return `${(milliseconds / 3600000).toFixed(milliseconds < 10 * 3600000 ? 1 : 0)} h`;
+  return `${Math.round(milliseconds / 86400000)} días`;
+};
+
+// No interpolamos una telemetría inexistente: unir puntos separados dibujaría
+// una diagonal que aparenta una medición continua.
+function continuousSegments(values, maximumGapMs) {
+  return values.reduce((segments, value) => {
+    const current = segments.at(-1);
+    if (!current || value.time - current.at(-1).time > maximumGapMs) {
+      segments.push([value]);
+    } else {
+      current.push(value);
+    }
+    return segments;
+  }, []);
+}
 
 export function DeviceTelemetryChart() {
   const [period, setPeriod] = useState("24h");
@@ -27,10 +50,11 @@ export function DeviceTelemetryChart() {
   const [hovered, setHovered] = useState(null);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [chartRevision, setChartRevision] = useState(0);
 
   useEffect(() => {
     let mounted = true;
-    getDeviceTelemetry({ period, resolution })
+    const load = () => getDeviceTelemetry({ period, resolution })
       .then((result) => {
         if (!mounted) return;
         setData(result);
@@ -38,20 +62,32 @@ export function DeviceTelemetryChart() {
           ? new Set(result.devices.map((device) => device.id))
           : new Set([...current].filter((id) => result.devices.some((device) => device.id === id))));
         setError("");
+        setChartRevision((current) => current + 1);
       })
       .catch((requestError) => mounted && setError(requestError.message));
-    return () => { mounted = false; };
+    load();
+    const timer = window.setInterval(load, TELEMETRY_REFRESH_MS);
+    return () => { mounted = false; window.clearInterval(timer); };
   }, [period, resolution]);
 
-  const { lines, start, end } = useMemo(() => {
-    if (!data) return { lines: [], start: 0, end: 1 };
+  const { lines, start, end, dataCoverage, useRecentFocus } = useMemo(() => {
+    if (!data) return { lines: [], start: 0, end: 1, dataCoverage: 0, useRecentFocus: false };
     const filtered = data.points.filter((point) => point.metric_code === metric);
     const timestamps = filtered.map((point) => new Date(point.bucket).getTime());
-    const endTime = timestamps.length ? Math.max(...timestamps) : Date.now();
-    const startTime = endTime - PERIOD_MS[period];
+    const latestTime = timestamps.length ? Math.max(...timestamps) : Date.now();
+    const earliestTime = timestamps.length ? Math.min(...timestamps) : latestTime;
+    const coverage = Math.max(0, latestTime - earliestTime);
+    const requestedWindow = PERIOD_MS[period];
+    const recentFocus = timestamps.length > 0 && coverage < requestedWindow * 0.9;
+    const padding = Math.max(RESOLUTION_MS[resolution] * 3, coverage * 0.12);
+    const recentWindow = Math.min(requestedWindow, Math.max(MIN_RECENT_WINDOW_MS, coverage + padding * 2));
+    const endTime = recentFocus ? Math.max(Date.now(), latestTime + RESOLUTION_MS[resolution]) : latestTime;
+    const startTime = endTime - (recentFocus ? recentWindow : requestedWindow);
     return {
       start: startTime,
       end: endTime,
+      dataCoverage: coverage,
+      useRecentFocus: recentFocus,
       lines: data.devices
         .map((device, index) => ({
           ...device,
@@ -74,6 +110,8 @@ export function DeviceTelemetryChart() {
   const pointX = (time) => PAD.left + Math.max(0, Math.min(1, (time - start) / (end - start || 1))) * innerW;
   const pointY = (value) => PAD.top + innerH * (0.88 - ((value - min) / range) * 0.76);
   const denseView = activeLines.length > 3 && ["15s", "1m"].includes(resolution);
+  // Se tolera un ciclo perdido sin unir intervalos realmente ausentes.
+  const maximumGapMs = RESOLUTION_MS[resolution] * 2.5;
 
   const toggleLine = (id) => setVisible((current) => {
     const next = new Set(current ?? []);
@@ -131,23 +169,26 @@ export function DeviceTelemetryChart() {
       )}
 
       {denseView && <p className="telemetry-density-note">Vista de alta densidad: oculta dispositivos o usa un intervalo de muestreo de 5 min o mayor para mejorar la lectura.</p>}
+      {data && useRecentFocus && <p className="device-telemetry-chart__coverage">Vista reciente · {formatCoverage(dataCoverage)} de datos disponibles</p>}
       {!data && !error && <p className="device-muted"><LoaderCircle size={16} className="telemetry-loading" /> Cargando lecturas por dispositivo...</p>}
       {error && <p className="device-form-error">{error}</p>}
 
       {data && (
         <div className="device-telemetry-chart-wrap">
-          <svg className="device-telemetry-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
+          <svg className="device-telemetry-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="Gráfico interactivo de lecturas por dispositivo" onMouseLeave={() => setHovered(null)}>
             {[0, 1, 2, 3, 4].map((index) => <line key={index} x1={PAD.left} x2={WIDTH - PAD.right} y1={PAD.top + (index * innerH) / 4} y2={PAD.top + (index * innerH) / 4} className="admin-chart__grid" />)}
             {activeLines.map((line) => (
-              <g key={line.id}>
-                <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke={line.color} strokeWidth={denseView ? "1.5" : "2.3"} strokeOpacity={denseView ? ".72" : "1"} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                {line.values.slice(1).map((value, index) => {
-                  const previous = line.values[index];
-                  return value.out_of_range && <line key={`alert-${value.bucket}`} x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" />;
-                })}
-                <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" onMouseMove={(event) => chooseNearest(event, line)} />
-                {line.values.filter((value) => value.out_of_range).map((value) => <circle key={`alert-point-${value.bucket}`} cx={pointX(value.time)} cy={pointY(value.value)} r="4.5" fill="#d93025" className="admin-chart__point" />)}
-                {line.values.length === 1 && <circle cx={pointX(line.values[0].time)} cy={pointY(line.values[0].value)} r="4" fill={line.values[0].out_of_range ? "#d93025" : line.color} className="admin-chart__point" />}
+              <g key={`${line.id}-${chartRevision}`} className="chart-series chart-series--enter">
+                {continuousSegments(line.values, maximumGapMs).map((segment) => <React.Fragment key={`${line.id}-${segment[0].bucket}`}>
+                  {segment.length > 1 && <><polyline className="chart-series__line" points={segment.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke={line.color} strokeWidth={denseView ? "1.5" : "2.3"} strokeOpacity={denseView ? ".72" : "1"} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /><polyline points={segment.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" onMouseMove={(event) => chooseNearest(event, line)} /></>}
+                  {segment.length === 1 && !(segment[0].out_of_range || segment[0].simulated_peak) && <circle cx={pointX(segment[0].time)} cy={pointY(segment[0].value)} r="3.5" fill={line.color} className="admin-chart__point" onMouseEnter={() => setHovered({ ...segment[0], device: line.name, color: line.color })} />}
+                  {segment.slice(1).map((value, index) => {
+                    const previous = segment[index];
+                    const needsAttention = value.out_of_range || value.simulated_peak;
+                    return needsAttention && <g key={`alert-${value.bucket}`}><line className="chart-alert-aura" x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} /><line x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" /></g>;
+                  })}
+                </React.Fragment>)}
+                {line.values.filter((value) => value.out_of_range || value.simulated_peak).map((value) => <g key={`alert-point-${value.bucket}`}><circle className="chart-alert-halo" cx={pointX(value.time)} cy={pointY(value.value)} r="8" /><circle cx={pointX(value.time)} cy={pointY(value.value)} r="4.5" fill="#d93025" className="admin-chart__point" /></g>)}
               </g>
             ))}
             {hovered && <line x1={pointX(hovered.time)} x2={pointX(hovered.time)} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}

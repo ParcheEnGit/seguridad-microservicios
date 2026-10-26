@@ -3,7 +3,7 @@ import json
 import os
 import random
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -73,7 +73,7 @@ def snmp_payload(metric: dict, event: str, peak: dict | None = None) -> dict:
     }
 
 
-def send_cycle() -> tuple[int, dict[str, list[str]], int]:
+def send_cycle() -> tuple[int, dict[str, list[str]]]:
     targets = request_json("/simulation-targets")
     pending_peaks = request_json("/simulation/peaks")
     peaks_by_metric = {
@@ -82,50 +82,42 @@ def send_cycle() -> tuple[int, dict[str, list[str]], int]:
     }
     sent = 0
     current_readings: dict[str, list[str]] = {}
-    history_readings = 0
     for target in targets:
         for metric in target["metrics"]:
             peak = peaks_by_metric.get((str(target["device_id"]), metric["metric_code"]))
-            timestamps = [datetime.now(timezone.utc)]
-            if target["needs_history"]:
-                # Una carga histórica ligera, distribuida durante siete días, mantiene
-                # legibles los gráficos de 24 h y de periodos más largos desde la demo.
-                now = datetime.now(timezone.utc)
-                timestamps = [now - timedelta(hours=hour) for hour in range(7 * 24, 0, -6)] + [now]
-            for timestamp in timestamps:
-                is_current_reading = timestamp == timestamps[-1]
-                is_peak_reading = peak is not None and is_current_reading
-                random_peak = rare_peak_value(metric) if is_current_reading and not is_peak_reading else None
-                event = "pico_forzado" if is_peak_reading else (random_peak[1] if random_peak else "normal")
-                value = peak["value"] if is_peak_reading else (random_peak[0] if random_peak else simulated_value(metric))
-                try:
-                    result = request_json(
-                        "/readings",
-                        method="POST",
-                        payload={
-                            "device_id": target["device_id"],
-                            "metric_code": metric["metric_code"],
-                            "unit": metric["unit"],
-                            "value": value,
-                            "equipment_status": "operativo",
-                            "recorded_at": timestamp.isoformat(),
-                            "payload": snmp_payload(metric, event, peak if is_peak_reading else None),
-                        },
-                    )
-                    sent += 1
-                    if is_current_reading:
-                        kind = "PICO FORZADO" if is_peak_reading else ("PICO ALEATORIO" if random_peak else "normal")
-                        alert = " · ALERTA" if result.get("out_of_range") else ""
-                        current_readings.setdefault(target["device_code"], []).append(
-                            f"SNMP {metric['metric_code']}={value} {metric['unit']} ({kind}{alert})"
-                        )
-                    else:
-                        history_readings += 1
-                    if is_peak_reading:
-                        request_json(f"/simulation/peaks/{peak['id']}/consume", method="POST", payload={})
-                except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-                    print(f"[ERROR] Lectura no enviada para {target['device_code']}: {exc}", flush=True)
-    return sent, current_readings, history_readings
+            # Cada ciclo representa una lectura del instante actual. No se
+            # inventa historia con timestamps antiguos: mezclar ese relleno con
+            # datos vivos producía brechas engañosas en las gráficas.
+            timestamp = datetime.now(timezone.utc)
+            is_peak_reading = peak is not None
+            random_peak = rare_peak_value(metric) if not is_peak_reading else None
+            event = "pico_forzado" if is_peak_reading else (random_peak[1] if random_peak else "normal")
+            value = peak["value"] if is_peak_reading else (random_peak[0] if random_peak else simulated_value(metric))
+            try:
+                result = request_json(
+                    "/readings",
+                    method="POST",
+                    payload={
+                        "device_id": target["device_id"],
+                        "metric_code": metric["metric_code"],
+                        "unit": metric["unit"],
+                        "value": value,
+                        "equipment_status": "operativo",
+                        "recorded_at": timestamp.isoformat(),
+                        "payload": snmp_payload(metric, event, peak if is_peak_reading else None),
+                    },
+                )
+                sent += 1
+                kind = "PICO FORZADO" if is_peak_reading else ("PICO ALEATORIO" if random_peak else "normal")
+                alert = " · ALERTA" if result.get("out_of_range") else ""
+                current_readings.setdefault(target["device_code"], []).append(
+                    f"SNMP {metric['metric_code']}={value} {metric['unit']} ({kind}{alert})"
+                )
+                if is_peak_reading:
+                    request_json(f"/simulation/peaks/{peak['id']}/consume", method="POST", payload={})
+            except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+                print(f"[ERROR] Lectura no enviada para {target['device_code']}: {exc}", flush=True)
+    return sent, current_readings
 
 
 def main() -> None:
@@ -139,7 +131,7 @@ def main() -> None:
             time.sleep(60)
             continue
         try:
-            sent, current_readings, history_readings = send_cycle()
+            sent, current_readings = send_cycle()
             timestamp = datetime.now().strftime("%H:%M:%S")
             print(
                 f"[CICLO {timestamp}] {sent} lecturas enviadas para "
@@ -148,11 +140,6 @@ def main() -> None:
             )
             for device_code, readings in current_readings.items():
                 print(f"  └─ {device_code}: {' | '.join(readings)}", flush=True)
-            if history_readings:
-                print(
-                    f"  └─ Historial inicial: {history_readings} lecturas distribuidas en 7 días.",
-                    flush=True,
-                )
         except (HTTPError, URLError, TimeoutError, ValueError) as exc:
             print(f"[ERROR] El ciclo de simulación falló: {exc}", flush=True)
         time.sleep(INTERVAL_SECONDS)
