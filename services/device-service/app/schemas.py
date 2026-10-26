@@ -86,10 +86,20 @@ class DeviceUpdate(BaseModel):
         return value
 
 
-class ThresholdResponse(ThresholdInput):
+class ThresholdResponse(BaseModel):
+    """Representación persistida.
+
+    La validación estricta de unidades pertenece a ``ThresholdInput`` (datos
+    nuevos). La respuesta no debe convertir un valor legado en un 500 mientras
+    la migración de normalización se ejecuta.
+    """
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     device_id: uuid.UUID
+    metric_code: str
+    unit: str
+    min_value: float
+    max_value: float
     created_at: datetime
     updated_at: datetime
 
