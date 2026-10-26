@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, LoaderCircle, Maximize2, Minimize2 } from "lucide-react";
+import { TELEMETRY_REFRESH_MS } from "../../constants/telemetry.js";
 import { getDeviceTelemetry } from "../../services/reportApi.js";
 
 const WIDTH = 900;
@@ -27,10 +28,11 @@ export function DeviceTelemetryChart() {
   const [hovered, setHovered] = useState(null);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [chartRevision, setChartRevision] = useState(0);
 
   useEffect(() => {
     let mounted = true;
-    getDeviceTelemetry({ period, resolution })
+    const load = () => getDeviceTelemetry({ period, resolution })
       .then((result) => {
         if (!mounted) return;
         setData(result);
@@ -38,9 +40,12 @@ export function DeviceTelemetryChart() {
           ? new Set(result.devices.map((device) => device.id))
           : new Set([...current].filter((id) => result.devices.some((device) => device.id === id))));
         setError("");
+        setChartRevision((current) => current + 1);
       })
       .catch((requestError) => mounted && setError(requestError.message));
-    return () => { mounted = false; };
+    load();
+    const timer = window.setInterval(load, TELEMETRY_REFRESH_MS);
+    return () => { mounted = false; window.clearInterval(timer); };
   }, [period, resolution]);
 
   const { lines, start, end } = useMemo(() => {
@@ -136,17 +141,18 @@ export function DeviceTelemetryChart() {
 
       {data && (
         <div className="device-telemetry-chart-wrap">
-          <svg className="device-telemetry-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
+          <svg className="device-telemetry-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="Gráfico interactivo de lecturas por dispositivo" onMouseLeave={() => setHovered(null)}>
             {[0, 1, 2, 3, 4].map((index) => <line key={index} x1={PAD.left} x2={WIDTH - PAD.right} y1={PAD.top + (index * innerH) / 4} y2={PAD.top + (index * innerH) / 4} className="admin-chart__grid" />)}
             {activeLines.map((line) => (
-              <g key={line.id}>
-                <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke={line.color} strokeWidth={denseView ? "1.5" : "2.3"} strokeOpacity={denseView ? ".72" : "1"} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <g key={`${line.id}-${chartRevision}`} className="chart-series chart-series--enter">
+                <polyline className="chart-series__line" points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke={line.color} strokeWidth={denseView ? "1.5" : "2.3"} strokeOpacity={denseView ? ".72" : "1"} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                 {line.values.slice(1).map((value, index) => {
                   const previous = line.values[index];
-                  return value.out_of_range && <line key={`alert-${value.bucket}`} x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" />;
+                  const needsAttention = value.out_of_range || value.simulated_peak;
+                  return needsAttention && <g key={`alert-${value.bucket}`}><line className="chart-alert-aura" x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} /><line x1={pointX(previous.time)} y1={pointY(previous.value)} x2={pointX(value.time)} y2={pointY(value.value)} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" /></g>;
                 })}
                 <polyline points={line.values.map((value) => `${pointX(value.time)},${pointY(value.value)}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" onMouseMove={(event) => chooseNearest(event, line)} />
-                {line.values.filter((value) => value.out_of_range).map((value) => <circle key={`alert-point-${value.bucket}`} cx={pointX(value.time)} cy={pointY(value.value)} r="4.5" fill="#d93025" className="admin-chart__point" />)}
+                {line.values.filter((value) => value.out_of_range || value.simulated_peak).map((value) => <g key={`alert-point-${value.bucket}`}><circle className="chart-alert-halo" cx={pointX(value.time)} cy={pointY(value.value)} r="8" /><circle cx={pointX(value.time)} cy={pointY(value.value)} r="4.5" fill="#d93025" className="admin-chart__point" /></g>)}
                 {line.values.length === 1 && <circle cx={pointX(line.values[0].time)} cy={pointY(line.values[0].value)} r="4" fill={line.values[0].out_of_range ? "#d93025" : line.color} className="admin-chart__point" />}
               </g>
             ))}
