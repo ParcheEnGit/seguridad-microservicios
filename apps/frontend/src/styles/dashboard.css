@@ -1381,6 +1381,13 @@
   border-radius: 99px;
 }
 
+.admin-chart-coverage {
+  border-left: 1px solid #dce7e1;
+  padding-left: 12px;
+  color: #527060;
+  font-weight: 650;
+}
+
 .admin-chart__grid {
   stroke: #edf1ef;
   stroke-width: 1;
@@ -1394,6 +1401,40 @@
 
 .admin-chart__point { cursor: crosshair; stroke: #fff; stroke-width: 1.5; }
 .admin-chart__guide { stroke: #93a79c; stroke-width: 1; stroke-dasharray: 3 4; }
+
+/* Transiciones breves al llegar telemetría nueva y una señal discreta, pero
+   visible, sobre los tramos que salen del umbral. */
+.chart-series--enter { animation: chart-series-fade-in .52s ease-out both; }
+.chart-series__line { animation: chart-series-settle .62s cubic-bezier(.22, .8, .3, 1) both; }
+.chart-alert-aura { stroke: #ef5350; stroke-width: 10; stroke-linecap: round; opacity: .18; vector-effect: non-scaling-stroke; animation: chart-alert-glow 1.7s ease-in-out infinite; }
+.chart-alert-halo { fill: #ef5350; opacity: .22; transform-box: fill-box; transform-origin: center; animation: chart-alert-pulse 1.7s ease-in-out infinite; pointer-events: none; }
+
+@keyframes chart-series-fade-in {
+  from { opacity: .2; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chart-series-settle {
+  from { opacity: .18; filter: saturate(.75) blur(.15px); }
+  to { opacity: 1; filter: saturate(1) blur(0); }
+}
+
+@keyframes chart-alert-glow {
+  0%, 100% { opacity: .15; stroke-width: 8; }
+  50% { opacity: .42; stroke-width: 13; }
+}
+
+@keyframes chart-alert-pulse {
+  0%, 100% { opacity: .16; transform: scale(.82); }
+  50% { opacity: .5; transform: scale(1.28); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-series--enter,
+  .chart-series__line,
+  .chart-alert-aura,
+  .chart-alert-halo { animation: none; }
+}
 
 .admin-chart-card__actions {
   display: flex;
@@ -1555,6 +1596,7 @@
   .device-telemetry-chart { height: 235px; }
   .chart-tooltip { max-width: calc(100% - 18px); padding: 7px 9px; }
   .admin-chart-card__actions { justify-content: flex-start; }
+  .admin-chart-coverage { width: 100%; border-left: 0; padding-left: 0; }
   .admin-threshold-modal__grid { grid-template-columns: 1fr; }
 }
 
