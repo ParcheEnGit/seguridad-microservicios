@@ -5,12 +5,46 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ALLOWED_STATUSES = {"activo", "inactivo", "mantenimiento"}
 
+# Catálogo pequeño y explícito para evitar que la configuración de umbrales
+# termine almacenando unidades ambiguas o inventadas (por ejemplo, "XD").
+# Las métricas soportadas hoy por el simulador y los dashboards están incluidas,
+# junto a magnitudes técnicas habituales para los dispositivos de laboratorio.
+ALLOWED_UNITS_BY_METRIC = {
+    "temperatura": {"°C", "°F"},
+    "humedad": {"%"},
+    "co2": {"ppm"},
+    "calidad_aire": {"ppm"},
+    "presion": {"Pa", "hPa", "kPa"},
+    "voltaje": {"mV", "V"},
+    "corriente": {"mA", "A"},
+    "potencia": {"W", "kW"},
+    "iluminacion": {"lx"},
+}
+
 
 class ThresholdInput(BaseModel):
     metric_code: str = Field(min_length=2, max_length=50, pattern=r"^[a-z0-9_]+$")
     unit: str = Field(min_length=1, max_length=20)
     min_value: float
     max_value: float
+
+    @field_validator("metric_code")
+    @classmethod
+    def metric_is_supported(cls, value: str) -> str:
+        metric_code = value.strip().lower()
+        if metric_code not in ALLOWED_UNITS_BY_METRIC:
+            raise ValueError("Métrica no admitida para umbrales")
+        return metric_code
+
+    @field_validator("unit")
+    @classmethod
+    def unit_matches_metric(cls, value: str, info) -> str:
+        unit = value.strip()
+        metric_code = info.data.get("metric_code")
+        if metric_code and unit not in ALLOWED_UNITS_BY_METRIC[metric_code]:
+            allowed_units = ", ".join(sorted(ALLOWED_UNITS_BY_METRIC[metric_code]))
+            raise ValueError(f"Unidad no válida para {metric_code}. Usa: {allowed_units}")
+        return unit
 
     @field_validator("max_value")
     @classmethod
