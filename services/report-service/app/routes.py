@@ -141,6 +141,13 @@ DEVICE_SERIES_SQL = text("""
         ON t.device_id = r.device_id AND t.metric_code = r.metric_code
     WHERE r.recorded_at >= NOW() - CAST(:period AS interval)
       AND r.metric_code IN ('temperatura', 'humedad')
+      -- No se muestran rellenos históricos antiguos del simulador. Fueron
+      -- recibidos mucho después de su timestamp y no representan mediciones
+      -- continuas; conservarlos visualmente creaba diagonales engañosas.
+      AND (
+          r.source IS DISTINCT FROM 'simulador'
+          OR r.received_at - r.recorded_at <= INTERVAL '5 minutes'
+      )
     GROUP BY 1, r.device_id, r.metric_code
     ORDER BY 1, r.device_id, r.metric_code
 """)
