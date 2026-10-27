@@ -137,7 +137,14 @@ def replace_thresholds(
         Threshold(metric_code=item.metric_code, unit=item.unit, min_value=item.min_value, max_value=item.max_value)
         for item in payload
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se pudieron guardar los umbrales por un conflicto de datos. Revisa que no haya métricas duplicadas e inténtalo de nuevo.",
+        ) from exc
     return get_device_or_404(device_id, db).thresholds
 
 

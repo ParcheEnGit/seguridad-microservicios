@@ -58,11 +58,49 @@ function isThresholdNumberInRange(value) {
 // pues cambia con cada tecla y React recreaba el campo perdiendo el foco.
 function createThreshold(values = {}) {
   thresholdSequence += 1;
+  const merged = { ...EMPTY_THRESHOLD, ...values };
+  // Normaliza unidades legadas (p. ej. "Xd") a la unidad del catálogo que
+  // también muestra el <select>; si no, el UI enseña °C pero el PUT envía "Xd".
   return {
-    ...EMPTY_THRESHOLD,
-    ...values,
+    ...merged,
+    unit: normalizedUnit(merged.metric_code, merged.unit),
     _key: values._key ?? values.id ?? `threshold-${thresholdSequence}`,
   };
+}
+
+function formatThresholdPayload(thresholds) {
+  return thresholds.map(({ metric_code, unit, min_value, max_value }) => {
+    const metric = metric_code.trim().toLowerCase();
+    return {
+      metric_code: metric,
+      unit: normalizedUnit(metric, unit.trim()),
+      min_value: Number(min_value),
+      max_value: Number(max_value),
+    };
+  });
+}
+
+function validateThresholdPayload(payload, thresholds) {
+  if (payload.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) {
+    return "Completa los valores de cada umbral o elimina la fila vacía.";
+  }
+  if (payload.some((item) => !unitOptions(item.metric_code).includes(item.unit))) {
+    return "Cada umbral debe usar una métrica admitida y una de sus unidades válidas.";
+  }
+  if (thresholds.some((item) => item.metric_code.trim().length > THRESHOLD_METRIC_MAX_LENGTH || item.unit.trim().length > THRESHOLD_UNIT_MAX_LENGTH)) {
+    return `La métrica admite hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres y la unidad hasta ${THRESHOLD_UNIT_MAX_LENGTH}.`;
+  }
+  if (thresholds.some((item) => !isThresholdNumberInRange(item.min_value) || !isThresholdNumberInRange(item.max_value))) {
+    return `Mínimo y máximo deben estar entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}.`;
+  }
+  if (payload.some((item) => item.max_value <= item.min_value)) {
+    return "El valor máximo debe ser mayor que el mínimo en cada umbral.";
+  }
+  const metrics = payload.map((item) => item.metric_code);
+  if (metrics.length !== new Set(metrics).size) {
+    return "No se puede repetir una métrica en los umbrales.";
+  }
+  return "";
 }
 
 function Modal({ title, subtitle, children, onClose }) {
@@ -116,22 +154,13 @@ function DeviceFormModal({ device, onClose, onSaved }) {
     event.preventDefault();
     setError("");
     const payload = { name: form.name.trim(), device_type: form.device_type.trim(), location: form.location.trim(), status: form.status };
-    const formattedThresholds = thresholds.map(({ metric_code, unit, min_value, max_value }) => ({ metric_code: metric_code.trim().toLowerCase(), unit: unit.trim(), min_value: Number(min_value), max_value: Number(max_value) }));
+    const formattedThresholds = formatThresholdPayload(thresholds);
     if (!editing && includeThresholds) {
-      if (formattedThresholds.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) {
-        setError("Completa los valores de cada umbral o desactiva la configuración inicial.");
-        return;
-      }
-      if (thresholds.some((item) => item.metric_code.trim().length > THRESHOLD_METRIC_MAX_LENGTH || item.unit.trim().length > THRESHOLD_UNIT_MAX_LENGTH)) {
-        setError(`La métrica admite hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres y la unidad hasta ${THRESHOLD_UNIT_MAX_LENGTH}.`);
-        return;
-      }
-      if (thresholds.some((item) => !isThresholdNumberInRange(item.min_value) || !isThresholdNumberInRange(item.max_value))) {
-        setError(`Mínimo y máximo deben estar entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}.`);
-        return;
-      }
-      if (formattedThresholds.some((item) => item.max_value <= item.min_value)) {
-        setError("El valor máximo debe ser mayor que el mínimo en cada umbral.");
+      const thresholdError = validateThresholdPayload(formattedThresholds, thresholds);
+      if (thresholdError) {
+        setError(thresholdError === "Completa los valores de cada umbral o elimina la fila vacía."
+          ? "Completa los valores de cada umbral o desactiva la configuración inicial."
+          : thresholdError);
         return;
       }
     }
@@ -168,7 +197,15 @@ function DeviceFormModal({ device, onClose, onSaved }) {
 }
 
 function ThresholdModal({ device, onClose, onSaved }) {
-  const [thresholds, setThresholds] = useState(() => device.thresholds.map((item) => createThreshold({ ...item, min_value: String(item.min_value), max_value: String(item.max_value) })));
+  const [thresholds, setThresholds] = useState(() => {
+    const existing = device.thresholds ?? [];
+    if (!existing.length) return [createThreshold()];
+    return existing.map((item) => createThreshold({
+      ...item,
+      min_value: String(item.min_value),
+      max_value: String(item.max_value),
+    }));
+  });
   const [notify, setNotify] = useState(device.metadata?.notify_on_threshold_breach ?? true);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => {
@@ -184,19 +221,11 @@ function ThresholdModal({ device, onClose, onSaved }) {
 
   async function submit(event) {
     event.preventDefault(); setError("");
-    const payload = thresholds.map(({ metric_code, unit, min_value, max_value }) => ({ metric_code: metric_code.trim().toLowerCase(), unit: unit.trim(), min_value: Number(min_value), max_value: Number(max_value) }));
-    if (payload.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) { setError("Completa los valores de cada umbral o elimina la fila vacía."); return; }
-    if (thresholds.some((item) => item.metric_code.trim().length > THRESHOLD_METRIC_MAX_LENGTH || item.unit.trim().length > THRESHOLD_UNIT_MAX_LENGTH)) {
-      setError(`La métrica admite hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres y la unidad hasta ${THRESHOLD_UNIT_MAX_LENGTH}.`);
-      return;
-    }
-    if (thresholds.some((item) => !isThresholdNumberInRange(item.min_value) || !isThresholdNumberInRange(item.max_value))) {
-      setError(`Mínimo y máximo deben estar entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}.`);
-      return;
-    }
-    if (payload.some((item) => item.max_value <= item.min_value)) { setError("El valor máximo debe ser mayor que el mínimo en cada umbral."); return; }
+    const payload = formatThresholdPayload(thresholds);
+    const thresholdError = validateThresholdPayload(payload, thresholds);
+    if (thresholdError) { setError(thresholdError); return; }
     setSaving(true);
-    try { await replaceThresholds(device.id, payload); await updateDevice(device.id, { metadata: { ...device.metadata, notify_on_threshold_breach: notify } }); await onSaved(); } catch (requestError) { setError(requestError.message); } finally { setSaving(false); }
+    try { await replaceThresholds(device.id, payload); await updateDevice(device.id, { metadata: { ...(device.metadata ?? {}), notify_on_threshold_breach: notify } }); await onSaved(); } catch (requestError) { setError(requestError.message); } finally { setSaving(false); }
   }
 
   return <Modal title={`Configurar umbrales — ${device.name}`} subtitle="Define los rangos permitidos para cada métrica del dispositivo." onClose={onClose}><form onSubmit={submit} className="device-form">{error && <p className="device-form-error" role="alert">{error}</p>}<div className="device-threshold-grid">{thresholds.map((threshold, index) => <ThresholdFields key={threshold._key} threshold={threshold} index={index} removable onChange={updateThreshold} onRemove={() => setThresholds((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}</div><button type="button" className="device-add-threshold" onClick={() => setThresholds((current) => [...current, createThreshold()])}><Plus size={16} /> Añadir métrica</button><label className="device-notification-toggle"><span><strong>Notificar al superar umbral</strong><small>Se enviará una alerta cuando una lectura salga del rango.</small></span><input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} /></label><div className="device-form-actions"><button type="button" className="device-secondary-btn" onClick={onClose}>Cancelar</button><button className="device-primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button></div></form></Modal>;

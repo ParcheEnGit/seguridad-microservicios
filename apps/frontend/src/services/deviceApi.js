@@ -17,11 +17,15 @@ function formatValidationError(detail) {
   return detail.map((issue) => {
     const location = Array.isArray(issue.loc) ? issue.loc : [];
     const thresholdPosition = location.indexOf("thresholds");
+    const listIndex = location.find((part) => Number.isInteger(part));
     const threshold = thresholdPosition >= 0 && Number.isInteger(location[thresholdPosition + 1])
       ? `Umbral ${location[thresholdPosition + 1] + 1}`
-      : "";
+      : Number.isInteger(listIndex)
+        ? `Umbral ${listIndex + 1}`
+        : "";
     const field = FIELD_LABELS[location.at(-1)] ?? "Dato";
-    return `${[threshold, field].filter(Boolean).join(" · ")}: ${issue.msg ?? "valor no válido"}.`;
+    const message = String(issue.msg ?? "valor no válido").replace(/^Value error,\s*/i, "");
+    return `${[threshold, field].filter(Boolean).join(" · ")}: ${message}.`;
   }).join(" ");
 }
 
