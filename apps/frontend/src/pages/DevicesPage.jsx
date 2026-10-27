@@ -7,6 +7,11 @@ import { fetchAlerts } from "../services/dashboardApi.js";
 const PAGE_SIZE = 10;
 const EMPTY_DEVICE = { device_code: "", name: "", device_type: "", location: "", status: "activo" };
 const EMPTY_THRESHOLD = { metric_code: "temperatura", unit: "°C", min_value: "", max_value: "" };
+// Límites alineados con ThresholdInput / Numeric(12, 4) del device-service.
+const THRESHOLD_METRIC_MAX_LENGTH = 50;
+const THRESHOLD_UNIT_MAX_LENGTH = 20;
+const THRESHOLD_VALUE_ABS_MAX = 99_999_999.9999;
+const THRESHOLD_VALUE_MAX_LENGTH = 14; // p. ej. -99999999.9999
 const METRIC_UNITS = {
   temperatura: ["°C", "°F"],
   humedad: ["%"],
@@ -26,6 +31,27 @@ const unitOptions = (metricCode) => METRIC_UNITS[metricKey(metricCode)] ?? [];
 function normalizedUnit(metricCode, unit) {
   const options = unitOptions(metricCode);
   return options.includes(unit) ? unit : (options[0] ?? "");
+}
+
+function sanitizeMetricCode(value) {
+  return String(value).slice(0, THRESHOLD_METRIC_MAX_LENGTH);
+}
+
+function sanitizeThresholdNumber(value) {
+  const raw = String(value);
+  if (raw === "" || raw === "-" || raw === "." || raw === "-.") return raw;
+  if (raw.length > THRESHOLD_VALUE_MAX_LENGTH) return raw.slice(0, THRESHOLD_VALUE_MAX_LENGTH);
+  const numeric = Number(raw);
+  if (!Number.isNaN(numeric) && Math.abs(numeric) > THRESHOLD_VALUE_ABS_MAX) {
+    const clamped = Math.sign(numeric) * THRESHOLD_VALUE_ABS_MAX;
+    return String(clamped);
+  }
+  return raw;
+}
+
+function isThresholdNumberInRange(value) {
+  const numeric = Number(value);
+  return !Number.isNaN(numeric) && Math.abs(numeric) <= THRESHOLD_VALUE_ABS_MAX;
 }
 
 // La clave permanece igual mientras se escribe: no usar metric_code como key,
@@ -64,8 +90,13 @@ function DeviceFormModal({ device, onClose, onSaved }) {
   const change = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => {
     if (itemIndex !== index) return item;
-    if (field !== "metric_code") return { ...item, [field]: value };
-    return { ...item, metric_code: value, unit: normalizedUnit(value, item.unit) };
+    if (field === "metric_code") {
+      const metric_code = sanitizeMetricCode(value);
+      return { ...item, metric_code, unit: normalizedUnit(metric_code, item.unit) };
+    }
+    if (field === "min_value" || field === "max_value") return { ...item, [field]: sanitizeThresholdNumber(value) };
+    if (field === "unit") return { ...item, unit: String(value).slice(0, THRESHOLD_UNIT_MAX_LENGTH) };
+    return { ...item, [field]: value };
   }));
 
   function addPhotos(event) {
@@ -86,9 +117,23 @@ function DeviceFormModal({ device, onClose, onSaved }) {
     setError("");
     const payload = { name: form.name.trim(), device_type: form.device_type.trim(), location: form.location.trim(), status: form.status };
     const formattedThresholds = thresholds.map(({ metric_code, unit, min_value, max_value }) => ({ metric_code: metric_code.trim().toLowerCase(), unit: unit.trim(), min_value: Number(min_value), max_value: Number(max_value) }));
-    if (!editing && includeThresholds && formattedThresholds.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) {
-      setError("Completa los valores de cada umbral o desactiva la configuración inicial.");
-      return;
+    if (!editing && includeThresholds) {
+      if (formattedThresholds.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) {
+        setError("Completa los valores de cada umbral o desactiva la configuración inicial.");
+        return;
+      }
+      if (thresholds.some((item) => item.metric_code.trim().length > THRESHOLD_METRIC_MAX_LENGTH || item.unit.trim().length > THRESHOLD_UNIT_MAX_LENGTH)) {
+        setError(`La métrica admite hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres y la unidad hasta ${THRESHOLD_UNIT_MAX_LENGTH}.`);
+        return;
+      }
+      if (thresholds.some((item) => !isThresholdNumberInRange(item.min_value) || !isThresholdNumberInRange(item.max_value))) {
+        setError(`Mínimo y máximo deben estar entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}.`);
+        return;
+      }
+      if (formattedThresholds.some((item) => item.max_value <= item.min_value)) {
+        setError("El valor máximo debe ser mayor que el mínimo en cada umbral.");
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -128,14 +173,28 @@ function ThresholdModal({ device, onClose, onSaved }) {
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const updateThreshold = (index, field, value) => setThresholds((current) => current.map((item, itemIndex) => {
     if (itemIndex !== index) return item;
-    if (field !== "metric_code") return { ...item, [field]: value };
-    return { ...item, metric_code: value, unit: normalizedUnit(value, item.unit) };
+    if (field === "metric_code") {
+      const metric_code = sanitizeMetricCode(value);
+      return { ...item, metric_code, unit: normalizedUnit(metric_code, item.unit) };
+    }
+    if (field === "min_value" || field === "max_value") return { ...item, [field]: sanitizeThresholdNumber(value) };
+    if (field === "unit") return { ...item, unit: String(value).slice(0, THRESHOLD_UNIT_MAX_LENGTH) };
+    return { ...item, [field]: value };
   }));
 
   async function submit(event) {
     event.preventDefault(); setError("");
     const payload = thresholds.map(({ metric_code, unit, min_value, max_value }) => ({ metric_code: metric_code.trim().toLowerCase(), unit: unit.trim(), min_value: Number(min_value), max_value: Number(max_value) }));
     if (payload.some((item) => !item.metric_code || !item.unit || Number.isNaN(item.min_value) || Number.isNaN(item.max_value))) { setError("Completa los valores de cada umbral o elimina la fila vacía."); return; }
+    if (thresholds.some((item) => item.metric_code.trim().length > THRESHOLD_METRIC_MAX_LENGTH || item.unit.trim().length > THRESHOLD_UNIT_MAX_LENGTH)) {
+      setError(`La métrica admite hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres y la unidad hasta ${THRESHOLD_UNIT_MAX_LENGTH}.`);
+      return;
+    }
+    if (thresholds.some((item) => !isThresholdNumberInRange(item.min_value) || !isThresholdNumberInRange(item.max_value))) {
+      setError(`Mínimo y máximo deben estar entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}.`);
+      return;
+    }
+    if (payload.some((item) => item.max_value <= item.min_value)) { setError("El valor máximo debe ser mayor que el mínimo en cada umbral."); return; }
     setSaving(true);
     try { await replaceThresholds(device.id, payload); await updateDevice(device.id, { metadata: { ...device.metadata, notify_on_threshold_breach: notify } }); await onSaved(); } catch (requestError) { setError(requestError.message); } finally { setSaving(false); }
   }
@@ -147,7 +206,74 @@ function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
   const options = unitOptions(threshold.metric_code);
   const selectedUnit = normalizedUnit(threshold.metric_code, threshold.unit);
   const metricListId = `supported-threshold-metrics-${threshold._key}`;
-  return <div className="device-threshold-card"><div className="device-threshold-card__topline"><strong>Umbral {index + 1}</strong>{removable && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={onRemove}><X size={16} /></button>}</div><div className="device-threshold-grid__fields"><label>Métrica<input required value={threshold.metric_code} onChange={(event) => onChange(index, "metric_code", event.target.value)} placeholder="temperatura" list={metricListId} /><datalist id={metricListId}>{Object.keys(METRIC_UNITS).map((metric) => <option key={metric} value={metric} />)}</datalist></label><label>Unidad<select required value={selectedUnit} disabled={!options.length} onChange={(event) => onChange(index, "unit", event.target.value)}><option value="">{options.length ? "Selecciona una unidad" : "Selecciona una métrica válida"}</option>{options.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></label><label>Mínimo<input required type="number" step="any" value={threshold.min_value} onChange={(event) => onChange(index, "min_value", event.target.value)} placeholder="18" /></label><label>Máximo<input required type="number" step="any" value={threshold.max_value} onChange={(event) => onChange(index, "max_value", event.target.value)} placeholder="28" /></label></div></div>;
+  return (
+    <div className="device-threshold-card">
+      <div className="device-threshold-card__topline">
+        <strong>Umbral {index + 1}</strong>
+        {removable && <button type="button" className="device-icon-danger" aria-label={`Eliminar umbral ${index + 1}`} onClick={onRemove}><X size={16} /></button>}
+      </div>
+      <div className="device-threshold-grid__fields">
+        <label>
+          Métrica
+          <input
+            required
+            value={threshold.metric_code}
+            maxLength={THRESHOLD_METRIC_MAX_LENGTH}
+            minLength={2}
+            pattern="[a-zA-Z0-9_]+"
+            title={`Hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres (letras, números y guion bajo)`}
+            onChange={(event) => onChange(index, "metric_code", event.target.value)}
+            placeholder="temperatura"
+            list={metricListId}
+          />
+          <datalist id={metricListId}>{Object.keys(METRIC_UNITS).map((metric) => <option key={metric} value={metric} />)}</datalist>
+        </label>
+        <label>
+          Unidad
+          <select
+            required
+            value={selectedUnit}
+            disabled={!options.length}
+            onChange={(event) => onChange(index, "unit", event.target.value)}
+            title={`Unidad según la métrica (máx. ${THRESHOLD_UNIT_MAX_LENGTH} caracteres)`}
+          >
+            <option value="">{options.length ? "Selecciona una unidad" : "Selecciona una métrica válida"}</option>
+            {options.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+          </select>
+        </label>
+        <label>
+          Mínimo
+          <input
+            required
+            type="number"
+            step="any"
+            min={-THRESHOLD_VALUE_ABS_MAX}
+            max={THRESHOLD_VALUE_ABS_MAX}
+            maxLength={THRESHOLD_VALUE_MAX_LENGTH}
+            title={`Valor numérico entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}`}
+            value={threshold.min_value}
+            onChange={(event) => onChange(index, "min_value", event.target.value)}
+            placeholder="18"
+          />
+        </label>
+        <label>
+          Máximo
+          <input
+            required
+            type="number"
+            step="any"
+            min={-THRESHOLD_VALUE_ABS_MAX}
+            max={THRESHOLD_VALUE_ABS_MAX}
+            maxLength={THRESHOLD_VALUE_MAX_LENGTH}
+            title={`Valor numérico entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}`}
+            value={threshold.max_value}
+            onChange={(event) => onChange(index, "max_value", event.target.value)}
+            placeholder="28"
+          />
+        </label>
+      </div>
+    </div>
+  );
 }
 
 function DevicePhotoGallery({ photos, deviceName }) {
