@@ -346,14 +346,19 @@ function MobileDeviceCard({ device, actionProps }) {
   return <article className="device-mobile-card"><div className="device-mobile-card__header"><span className="device-mobile-card__icon">{photo ? <img src={photo.url} alt="" /> : <DeviceTypeIcon type={device.device_type} />}</span><div><strong>{device.name}</strong><p><span>{device.device_type}</span><span>{device.location}</span></p></div><div className="device-mobile-card__menu"><button type="button" aria-label={`Acciones para ${device.name}`} onClick={() => setShowActions((current) => !current)}><MoreVertical size={18} /></button>{showActions && <div className="device-mobile-card__popover"><DeviceActions device={device} {...actionProps} /></div>}</div></div><footer className="device-mobile-card__footer"><small>{formatUpdatedAt(device.updated_at)}</small><span className={`device-status device-status--${device.status}`}>{device.status}</span></footer></article>;
 }
 
-export function DevicesPage({ user }) {
+export function DevicesPage({ user, initialSearch = "" }) {
   const admin = canRegisterDevice(user.role);
   const [devices, setDevices] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [alertedDeviceNames, setAlertedDeviceNames] = useState(new Set());
   const [total, setTotal] = useState(0);
-  const [filters, setFilters] = useState({ search: "", device_type: "", location: "", status: "" });
-  const [quickFilter, setQuickFilter] = useState("todos");
+  const [filters, setFilters] = useState({
+    search: initialSearch,
+    device_type: "",
+    location: "",
+    status: "",
+  });
+  const [quickFilter, setQuickFilter] = useState(initialSearch ? "personalizado" : "todos");
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

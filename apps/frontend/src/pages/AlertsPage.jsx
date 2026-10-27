@@ -271,7 +271,7 @@ function AlertDetailDialog({ alertId, onClose }) {
   );
 }
 
-export function AlertsPage({ user }) {
+export function AlertsPage({ user, initialAlertId = "" }) {
   const admin = isAdmin(user.role);
   const [alerts, setAlerts] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -282,7 +282,7 @@ export function AlertsPage({ user }) {
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
   const [savingAlertId, setSavingAlertId] = useState("");
-  const [detailAlertId, setDetailAlertId] = useState("");
+  const [detailAlertId, setDetailAlertId] = useState(initialAlertId);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
