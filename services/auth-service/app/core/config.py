@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7
 
-    cors_origins: str = "http://localhost:8080,http://localhost:5173"
+    cors_origins: str = "https://localhost:8080"
 
     cookie_name: str = "labsentinel_session"
     cookie_secure: bool = False
@@ -31,11 +31,11 @@ class Settings(BaseSettings):
     # con PKCE; un cliente público no requiere ni debe exponer un secreto.
     keycloak_enabled: bool = False
     keycloak_url_internal: str = "http://keycloak:8080"
-    keycloak_url_public: str = "http://localhost:8081"
+    keycloak_url_public: str = "https://localhost:8081"
     keycloak_realm: str = "labsentinel"
     keycloak_client_id: str = "labsentinel-web"
-    keycloak_redirect_uri: str = "http://localhost:8080/api/auth/keycloak/callback"
-    keycloak_frontend_url: str = "http://localhost:8080/"
+    keycloak_redirect_uri: str = "https://localhost:8080/api/auth/keycloak/callback"
+    keycloak_frontend_url: str = "https://localhost:8080/"
     keycloak_state_cookie_name: str = "labsentinel_keycloak_state"
     keycloak_verifier_cookie_name: str = "labsentinel_keycloak_verifier"
 
