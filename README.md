@@ -24,7 +24,9 @@ continúa disponible mientras `KEYCLOAK_ENABLED=false`.
    ```powershell
    docker compose up --build
    ```
-4. Abrir `http://localhost:8080` (gateway + frontend).
+4. Abrir `https://localhost:8080` (gateway + frontend).
+   En el primer arranque, ejecutar `powershell -ExecutionPolicy Bypass -File scripts\trust-local-labsentinel-ca.ps1`
+   para confiar la CA de desarrollo local generada por Docker.
 5. Iniciar sesión con Google. El primer administrador se asigna con `ADMIN_EMAILS` (solo al crear el usuario).
 6. Comprobar salud vía gateway:
    - `/api/devices/health`
@@ -48,7 +50,7 @@ Checklist de demostración: [docs/checklist-demostracion.md](docs/checklist-demo
 | `ADMIN_EMAILS` | Correos que reciben rol admin en el **primer** alta |
 | `SIMULATOR_API_KEY` | Cabecera `X-Simulator-Key` del simulador |
 | `SIMULATOR_ENABLED` / `SIMULATOR_INTERVAL_SECONDS` | Control del simulador |
-| `CORS_ORIGINS` | Orígenes permitidos (p. ej. `http://localhost:8080`) |
+| `CORS_ORIGINS` | Orígenes HTTPS permitidos (p. ej. `https://localhost:8080`) |
 | `KEYCLOAK_ENABLED` / `VITE_KEYCLOAK_ENABLED` | Activa el acceso opcional con Keycloak en backend y UI |
 
 Plantilla completa: [`.env.example`](.env.example). Nunca suba `.env` al repositorio.
@@ -57,11 +59,11 @@ Plantilla completa: [`.env.example`](.env.example). Nunca suba `.env` al reposit
 
 | Recurso | URL / puerto |
 |---|---|
-| App (gateway) | `http://localhost:8080` |
-| Frontend Vite (contenedor) | `http://localhost:5173` |
-| Keycloak (opcional) | `http://localhost:8081` |
+| App (gateway) | `https://localhost:8080` |
+| Frontend Vite | red Docker interna; no se publica directamente |
+| Keycloak (opcional) | `https://localhost:8081` |
 | Postgres (host) | `localhost:5433` → contenedor `5432` |
-| OpenAPI telemetría | `http://localhost:8080/api/telemetry/docs` |
+| OpenAPI telemetría | `https://localhost:8080/api/telemetry/docs` |
 
 ## Estructura
 
