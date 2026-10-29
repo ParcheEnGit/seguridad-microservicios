@@ -33,10 +33,11 @@ export function GoogleSignInButton({ onSuccess, onError }) {
         onError={handleGoogleError}
         theme="outline"
         size="large"
-        width={360}
+        width={320}
         text="signin_with"
         shape="rectangular"
         locale="es"
+        logo_alignment="left"
       />
     </div>
   );
