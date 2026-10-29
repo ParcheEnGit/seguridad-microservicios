@@ -35,11 +35,32 @@ export function DashboardPage({ user, onLogout }) {
   const [error, setError] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
   const [ticketsEntry, setTicketsEntry] = useState({ view: "list", key: 0 });
+  const [deviceSearchQuery, setDeviceSearchQuery] = useState("");
+  const [deviceSearchKey, setDeviceSearchKey] = useState(0);
+  const [focusedAlertId, setFocusedAlertId] = useState("");
+  const [alertFocusKey, setAlertFocusKey] = useState(0);
 
   function navigate(item) {
     if (item === "tickets") setTicketsEntry((current) => ({ view: "list", key: current.key + 1 }));
     setActiveItem(item);
   }
+
+  function navigateToDeviceSearch(term) {
+    setDeviceSearchQuery(term);
+    setDeviceSearchKey((key) => key + 1);
+    setActiveItem("dispositivos");
+  }
+
+  function navigateToAlert(alertId) {
+    setFocusedAlertId(alertId);
+    setAlertFocusKey((key) => key + 1);
+    setActiveItem("alertas");
+  }
+
+  useEffect(() => {
+    if (activeItem !== "dispositivos") setDeviceSearchQuery("");
+    if (activeItem !== "alertas") setFocusedAlertId("");
+  }, [activeItem]);
 
   function openTicketForm() {
     setTicketsEntry((current) => ({ view: "create", key: current.key + 1 }));
@@ -124,11 +145,21 @@ export function DashboardPage({ user, onLogout }) {
       activeItem={activeItem}
       onNavigate={navigate}
       onLogout={onLogout}
+      onNavigateToDeviceSearch={navigateToDeviceSearch}
+      onNavigateToAlert={navigateToAlert}
     >
       {activeItem === "dispositivos" ? (
-        <DevicesPage user={user} />
+        <DevicesPage
+          key={`devices-${deviceSearchKey}`}
+          user={user}
+          initialSearch={deviceSearchQuery}
+        />
       ) : activeItem === "alertas" ? (
-        <AlertsPage user={user} />
+        <AlertsPage
+          key={`alerts-${alertFocusKey}`}
+          user={user}
+          initialAlertId={focusedAlertId}
+        />
       ) : activeItem === "tickets" ? (
         <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} user={user} />
       ) : activeItem === "telemetria" ? (

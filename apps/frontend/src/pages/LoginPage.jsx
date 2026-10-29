@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { KeyRound, Mail } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Mail } from "lucide-react";
 import logoUrl from "../assets/labsentinel-mark.svg";
 import { GoogleSignInButton } from "../components/GoogleSignInButton.jsx";
 import { loginWithPassword } from "../services/authApi.js";
@@ -119,8 +119,13 @@ export function LoginPage({ onLoginSuccess }) {
                 className="auth-toggle-password"
                 onClick={() => setShowPassword((current) => !current)}
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
               >
-                {showPassword ? "Ocultar" : "Mostrar"}
+                {showPassword ? (
+                  <EyeOff size={18} aria-hidden="true" />
+                ) : (
+                  <Eye size={18} aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
