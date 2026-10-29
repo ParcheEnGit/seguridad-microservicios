@@ -7,6 +7,8 @@ export function DashboardLayout({
   activeItem,
   onNavigate,
   onLogout,
+  onNavigateToDeviceSearch,
+  onNavigateToAlert,
   children,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -40,6 +42,8 @@ export function DashboardLayout({
           isMobileMenuOpen={mobileMenuOpen}
           onToggleMobileMenu={() => setMobileMenuOpen((current) => !current)}
           onOpenNotifications={() => navigate("alertas")}
+          onNavigateToDeviceSearch={onNavigateToDeviceSearch}
+          onNavigateToAlert={onNavigateToAlert}
         />
         <main className="dashboard-content">{children}</main>
       </div>
