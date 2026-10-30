@@ -13,6 +13,7 @@ SIMULATOR_KEY = os.environ["SIMULATOR_API_KEY"]
 INTERVAL_SECONDS = max(5, int(os.getenv("SIMULATOR_INTERVAL_SECONDS", "15")))
 SIMULATOR_ENABLED = os.getenv("SIMULATOR_ENABLED", "true").lower() == "true"
 RARE_PEAK_PROBABILITY = min(0.05, max(0.0, float(os.getenv("SIMULATOR_RARE_PEAK_PROBABILITY", "0.00005"))))
+SIMULATED_VALUES: dict[tuple[str, str], float] = {}
 
 # Perfil SNMP v2c emulado: conserva OID y versión en cada lectura para que la
 # integración con agentes físicos pueda sustituir al simulador sin cambiar el
@@ -35,16 +36,36 @@ def request_json(path: str, method: str = "GET", payload: dict | None = None) ->
         return json.loads(response.read().decode())
 
 
-def simulated_value(metric: dict) -> float:
+def simulated_value(device_id: str, metric: dict) -> float:
+    """Produce una señal continua: pequeñas variaciones y retorno al ambiente.
+
+    Una lectura física no salta aleatoriamente de un extremo operativo a otro
+    cada pocos segundos. El estado solo vive en el simulador (es apropiado para
+    una demo): al reiniciar se vuelve a sembrar cerca del punto medio.
+    """
     minimum = metric.get("min_value")
     maximum = metric.get("max_value")
     if minimum is not None and maximum is not None:
-        midpoint = (float(minimum) + float(maximum)) / 2
-        spread = max((float(maximum) - float(minimum)) * 0.22, 0.2)
-        return round(random.uniform(midpoint - spread, midpoint + spread), 2)
-    defaults = {"temperatura": (20, 27), "humedad": (45, 65)}
-    lower, upper = defaults.get(metric["metric_code"], (1, 100))
-    return round(random.uniform(lower, upper), 2)
+        lower, upper = float(minimum), float(maximum)
+    else:
+        defaults = {"temperatura": (20.0, 27.0), "humedad": (45.0, 65.0)}
+        lower, upper = defaults.get(metric["metric_code"], (1.0, 100.0))
+
+    midpoint = (lower + upper) / 2
+    span = max(upper - lower, 0.2)
+    key = (device_id, metric["metric_code"])
+    previous = SIMULATED_VALUES.get(key)
+    if previous is None:
+        previous = midpoint + random.uniform(-span * 0.05, span * 0.05)
+
+    # Paseo aleatorio acotado con reversión suave a la media. Con un ciclo de
+    # 15 s produce curvas estables y legibles, no saltos independientes.
+    step = max(span * 0.012, 0.04)
+    next_value = previous + (midpoint - previous) * 0.08 + random.uniform(-step, step)
+    margin = min(span * 0.08, max(span / 2 - 0.01, 0.01))
+    next_value = min(upper - margin, max(lower + margin, next_value))
+    SIMULATED_VALUES[key] = next_value
+    return round(next_value, 2)
 
 
 def rare_peak_value(metric: dict) -> tuple[float, str] | None:
@@ -92,7 +113,9 @@ def send_cycle() -> tuple[int, dict[str, list[str]]]:
             is_peak_reading = peak is not None
             random_peak = rare_peak_value(metric) if not is_peak_reading else None
             event = "pico_forzado" if is_peak_reading else (random_peak[1] if random_peak else "normal")
-            value = peak["value"] if is_peak_reading else (random_peak[0] if random_peak else simulated_value(metric))
+            value = peak["value"] if is_peak_reading else (
+                random_peak[0] if random_peak else simulated_value(str(target["device_id"]), metric)
+            )
             try:
                 result = request_json(
                     "/readings",

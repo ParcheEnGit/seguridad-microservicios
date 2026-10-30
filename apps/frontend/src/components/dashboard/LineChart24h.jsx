@@ -59,6 +59,11 @@ export function LineChart24h({ points }) {
     const y = (value) => PAD.top + innerH * (0.88 - ((value - min) / range) * 0.76);
     return { ...serie, min, max, values: values.map((value) => ({ ...value, cx: x(value.time), cy: y(value.value) })) };
   });
+  // Dos muestras no describen una tendencia. Además, al normalizar temperatura
+  // y humedad por separado, dos cambios proporcionales pueden quedar uno sobre
+  // otro; mostrar únicamente sus marcadores evita que una serie oculte a la
+  // otra durante los primeros minutos después de iniciar el simulador.
+  const hasTrend = lines.some((line) => line.values.length >= 3);
 
   const ticks = Array.from({ length: 7 }, (_, index) => start + (index * (end - start)) / 6);
   const selectNearest = (event, line) => {
@@ -87,13 +92,13 @@ export function LineChart24h({ points }) {
         {hovered && <line x1={hovered.cx} x2={hovered.cx} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}
         {lines.map((line) => line.values.length > 0 && (
           <g key={`${line.key}-${chartRevision}`} className="chart-series chart-series--enter">
-            <polyline className="chart-series__line" points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            {line.values.length >= 3 && <><polyline className="chart-series__line" points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeDasharray={line.key === "humedad" ? "7 5" : undefined} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             {line.values.slice(1).map((value, index) => {
               const previous = line.values[index];
               return value.outOfRange && <g key={`alert-${value.time}`}><line className="chart-alert-aura" x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} /><line x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" /></g>;
             })}
-            <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} />
-            {line.values.map((value) => value.outOfRange ? <g key={value.time}><circle className="chart-alert-halo" cx={value.cx} cy={value.cy} r="8" /><circle cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 4.8} className="admin-chart__point" fill="#d93025" onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} /></g> : <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 3.5} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
+            <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} /></>}
+            {line.values.map((value) => value.outOfRange ? <g key={value.time}><circle className="chart-alert-halo" cx={value.cx} cy={value.cy} r="8" /><circle cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 4.8} className="admin-chart__point" fill="#d93025" onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} /></g> : line.key === "humedad" ? <rect key={value.time} x={value.cx - 4} y={value.cy - 4} width={8} height={8} rx="1" className="admin-chart__point admin-chart__point--humidity" onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} /> : <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 3.5} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
           </g>
         ))}
       </svg>
@@ -101,6 +106,7 @@ export function LineChart24h({ points }) {
       <div className="admin-chart-summary" aria-label="Resumen de rangos">
         {lines.filter((line) => line.values.length).map((line) => <span key={line.key}><i style={{ background: line.color }} />{line.label}: {line.min.toFixed(1)}–{line.max.toFixed(1)} {line.unit}</span>)}
         {useRecentFocus && <span className="admin-chart-coverage">Vista reciente · {formatCoverage(dataCoverage)} de datos disponibles</span>}
+        {!hasTrend && <span className="admin-chart-coverage">Recopilando muestras para trazar la tendencia</span>}
       </div>
     </div>
   );

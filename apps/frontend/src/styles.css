@@ -222,14 +222,19 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+  overflow: visible;
 }
 
+/* No forzar el iframe al 100%: el botón de Google recorta el logo G. */
 .auth-google-wrapper > div {
-  width: 100% !important;
+  width: auto !important;
+  max-width: 100%;
 }
 
 .auth-google-wrapper iframe {
-  width: 100% !important;
+  max-width: 100%;
 }
 
 .auth-google-wrapper--loading {
