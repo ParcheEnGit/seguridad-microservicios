@@ -22,11 +22,11 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:8080/api/auth/keycloak/callback"],
-      "webOrigins": ["http://localhost:8080"],
+      "redirectUris": ["https://localhost:8080/api/auth/keycloak/callback"],
+      "webOrigins": ["https://localhost:8080"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:8080/*"
+        "post.logout.redirect.uris": "https://localhost:8080/*"
       },
       "protocolMappers": [
         {

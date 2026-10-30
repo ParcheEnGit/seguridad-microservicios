@@ -24,9 +24,12 @@ ALERT_FIELDS_SQL = """
         a.threshold_min,
         a.threshold_max,
         CASE
-            WHEN a.threshold_min IS NOT NULL AND a.value < a.threshold_min
-                THEN 'below_min'
-            ELSE 'above_max'
+            WHEN a.value < a.threshold_min THEN 'below_min'
+            WHEN a.value > a.threshold_max THEN 'above_max'
+            WHEN a.value - a.threshold_min <= 3
+                 AND a.value - a.threshold_min <= a.threshold_max - a.value
+                THEN 'near_min'
+            WHEN a.threshold_max - a.value <= 3 THEN 'near_max'
         END AS condition,
         a.severity,
         a.status,

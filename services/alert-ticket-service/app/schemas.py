@@ -16,6 +16,7 @@ TicketCategory = Literal[
     "suciedad_acumulada",
     "otro",
 ]
+TicketPriority = Literal["no_critica", "advertencia", "critica"]
 TicketStatus = Literal["abierto", "en_revision", "resuelto", "cerrado"]
 
 
@@ -61,7 +62,7 @@ class TicketResponse(BaseModel):
     device_code: str | None
     category: TicketCategory
     description: str
-    priority: Literal["no_critica"] = "no_critica"
+    priority: TicketPriority = "no_critica"
     status: TicketStatus
     created_at: datetime
     updated_at: datetime
@@ -89,7 +90,7 @@ class AlertSummary(BaseModel):
     unit: str
     threshold_min: Decimal | None
     threshold_max: Decimal | None
-    condition: Literal["below_min", "above_max"]
+    condition: Literal["below_min", "above_max", "near_min", "near_max"]
     severity: Literal["advertencia", "critica"]
     status: Literal["abierta", "revisada", "cerrada"]
     created_at: datetime

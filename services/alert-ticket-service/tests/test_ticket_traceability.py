@@ -17,6 +17,7 @@ READER_ID = 2
 OTHER_READER_ID = 3
 ADMIN_ID = 1
 DEVICE_ID = uuid.uuid4()
+ALERT_ID = uuid.uuid4()
 VALID_FORM = {
     "device_id": str(DEVICE_ID),
     "category": "carcasa_rota",
@@ -47,8 +48,10 @@ class FakeResult:
 
 
 class FakeDatabase:
-    def __init__(self, device_exists=True, ticket_owner_id=READER_ID):
+    def __init__(self, device_exists=True, ticket_owner_id=READER_ID, alert_device_id=DEVICE_ID, alert_severity="critica"):
         self.device_exists = device_exists
+        self.alert_device_id = alert_device_id
+        self.alert_severity = alert_severity
         self.ticket_id = uuid.uuid4()
         self.ticket_owner_id = ticket_owner_id
         self.ticket_insert = None
@@ -74,6 +77,7 @@ class FakeDatabase:
             "device_code": "RT-01",
             "category": "carcasa_rota",
             "description": VALID_FORM["description"],
+            "priority": "no_critica",
             "status": "abierto",
             "created_by_user_id": ticket_owner_id,
             "created_at": now,
@@ -92,9 +96,12 @@ class FakeDatabase:
             return FakeResult(row={"id": self.ticket_id})
         if "SELECT id FROM device_service.devices" in sql:
             return FakeResult(row={"id": DEVICE_ID} if self.device_exists else None)
+        if "SELECT device_id, severity" in sql:
+            return FakeResult(row={"device_id": self.alert_device_id, "severity": self.alert_severity})
         if "INSERT INTO alert_ticket_service.tickets" in sql:
             self.ticket_insert = params
             self.ticket_row["created_by_user_id"] = params["user_id"]
+            self.ticket_row["priority"] = params["priority"]
             return FakeResult(scalar=self.ticket_id)
         if "INSERT INTO alert_ticket_service.ticket_status_history" in sql:
             self.history_insert = {"sql": sql, **params}
@@ -168,9 +175,49 @@ def test_lector_registra_ticket_con_autor_y_primer_estado_trazable():
     body = response.json()
     assert body["status"] == "abierto"
     assert body["code"] == "TK-2026-000001"
+    assert body["priority"] == "no_critica"
     assert body["history"][0]["previous_status"] is None
     assert body["history"][0]["new_status"] == "abierto"
     assert body["history"][0]["note"] == "Ticket registrado"
+
+
+def test_ticket_hereda_prioridad_critica_de_alerta():
+    db = FakeDatabase()
+
+    response = client_for(db, READER_ID, role=1).post(
+        "/tickets",
+        data={**VALID_FORM, "priority": "advertencia", "alert_id": str(ALERT_ID)},
+    )
+
+    assert response.status_code == 201
+    assert db.ticket_insert["priority"] == "critica"
+    assert response.json()["priority"] == "critica"
+
+
+def test_ticket_hereda_prioridad_advertencia_de_alerta():
+    db = FakeDatabase(alert_severity="advertencia")
+
+    response = client_for(db, READER_ID, role=1).post(
+        "/tickets",
+        data={**VALID_FORM, "priority": "critica", "alert_id": str(ALERT_ID)},
+    )
+
+    assert response.status_code == 201
+    assert db.ticket_insert["priority"] == "advertencia"
+    assert response.json()["priority"] == "advertencia"
+
+
+def test_ticket_no_se_crea_si_alerta_no_corresponde_al_dispositivo():
+    db = FakeDatabase(alert_device_id=uuid.uuid4())
+
+    response = client_for(db, READER_ID, role=1).post(
+        "/tickets",
+        data={**VALID_FORM, "alert_id": str(ALERT_ID)},
+    )
+
+    assert response.status_code == 422
+    assert db.ticket_insert is None
+    assert not db.committed
 
 
 def test_ticket_para_dispositivo_inexistente_responde_404():

@@ -2,12 +2,22 @@ import React, { useCallback, useEffect, useState } from "react";
 import { BarChart3, Bell, ChevronRight, Plus, RefreshCw, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { getAdminSummary } from "../../services/reportApi.js";
 import { listDevices, replaceThresholds } from "../../services/deviceApi.js";
+import { TELEMETRY_REFRESH_MS } from "../../constants/telemetry.js";
 import { LineChart24h, SERIES } from "./LineChart24h.jsx";
 import { DeviceTelemetryChart } from "./DeviceTelemetryChart.jsx";
 
-const REFRESH_MS = 15 * 1000;
-
 const METRIC_NAMES = { temperatura: "Temperatura", humedad: "Humedad" };
+const CANONICAL_UNITS = {
+  temperatura: "°C",
+  humedad: "%",
+  co2: "ppm",
+  calidad_aire: "ppm",
+  presion: "hPa",
+  voltaje: "V",
+  corriente: "A",
+  potencia: "W",
+  iluminacion: "lx",
+};
 
 const formatTime = (value) =>
   new Date(value).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -70,9 +80,11 @@ const isAmbientDevice = (device) => [device.name, device.device_code, device.dev
 function EnvironmentThresholdModal({ device, onClose, onSaved }) {
   const initial = (metricCode, unit) => {
     const found = device.thresholds?.find((threshold) => threshold.metric_code === metricCode);
+    // No reenviar unidades legadas inválidas (p. ej. "Xd"): el catálogo del
+    // device-service solo admite la unidad canónica por métrica.
     return {
       metric_code: metricCode,
-      unit: found?.unit ?? unit,
+      unit,
       min_value: String(found?.min_value ?? ""),
       max_value: String(found?.max_value ?? ""),
     };
@@ -103,7 +115,14 @@ function EnvironmentThresholdModal({ device, onClose, onSaved }) {
     setSaving(true);
     setError("");
     try {
-      const preserved = (device.thresholds ?? []).filter((threshold) => !["temperatura", "humedad"].includes(threshold.metric_code));
+      const preserved = (device.thresholds ?? [])
+        .filter((threshold) => !["temperatura", "humedad"].includes(threshold.metric_code))
+        .map(({ metric_code, unit, min_value, max_value }) => ({
+          metric_code,
+          unit: CANONICAL_UNITS[metric_code] ?? unit,
+          min_value,
+          max_value,
+        }));
       await replaceThresholds(device.id, [...preserved, ...edited]);
       await onSaved();
     } catch (requestError) {
@@ -154,7 +173,7 @@ export function AdminDashboard({ onNavigate }) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, TELEMETRY_REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
 

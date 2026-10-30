@@ -179,27 +179,39 @@ def test_lectura_critica_repetida_escala_alerta_existente(client):
     assert any("SET severity = 'critica'" in sql for sql in db.statements)
 
 
-def test_lectura_advertencia_repetida_no_cambia_alerta_critica(client):
+def test_lectura_cerca_del_umbral_no_cambia_alerta_critica(client):
     db = FakeDatabase(
         threshold=THRESHOLD,
         existing_alert={"id": uuid.uuid4(), "severity": "critica"},
     )
 
-    response = post_reading(client, db, value="28.5")
+    response = post_reading(client, db, value="27.5")
 
     assert response.status_code == 201
     assert response.json()["severity"] == "advertencia"
     assert not any("UPDATE alert_ticket_service.alerts" in sql for sql in db.statements)
 
 
-def test_lectura_levemente_fuera_de_rango_crea_alerta_advertencia(client):
+def test_lectura_cerca_del_maximo_crea_alerta_advertencia(client):
     db = FakeDatabase(threshold=THRESHOLD, alert_insert={"id": uuid.uuid4()})
 
-    response = post_reading(client, db, value="28.5")
+    response = post_reading(client, db, value="25")
 
     assert response.status_code == 201
+    assert response.json()["out_of_range"] is False
+    assert response.json()["condition"] == "near_max"
     assert response.json()["severity"] == "advertencia"
     assert response.json()["alert_created"] is True
+
+
+def test_lectura_fuera_del_rango_es_critica_desde_el_primer_exceso(client):
+    db = FakeDatabase(threshold=THRESHOLD, alert_insert={"id": uuid.uuid4()})
+
+    response = post_reading(client, db, value="28.01")
+
+    assert response.status_code == 201
+    assert response.json()["out_of_range"] is True
+    assert response.json()["severity"] == "critica"
 
 
 def test_lectura_muy_fuera_de_rango_crea_alerta_critica(client):
@@ -216,13 +228,16 @@ def test_lectura_muy_fuera_de_rango_crea_alerta_critica(client):
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        ("18", None),
-        ("28", None),
+        ("18", ("near_min", "advertencia")),
+        ("21", ("near_min", "advertencia")),
+        ("21.01", None),
+        ("25", ("near_max", "advertencia")),
+        ("28", ("near_max", "advertencia")),
         ("23", None),
-        ("28.99", ("above_max", "advertencia")),
-        ("29", ("above_max", "critica")),
-        ("17.01", ("below_min", "advertencia")),
-        ("17", ("below_min", "critica")),
+        ("28.01", ("above_max", "critica")),
+        ("33", ("above_max", "critica")),
+        ("17.99", ("below_min", "critica")),
+        ("13", ("below_min", "critica")),
     ],
 )
 def test_clasificacion_de_severidad_en_los_limites(value, expected):

@@ -129,11 +129,22 @@ def replace_thresholds(
     if len(metric_codes) != len(set(metric_codes)):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se puede repetir una métrica en los umbrales")
     device.thresholds.clear()
+    # Fuerza los DELETE antes de insertar los reemplazos. Sin este flush,
+    # PostgreSQL puede evaluar primero el INSERT y chocar con la restricción
+    # única (device_id, metric_code) de los umbrales anteriores.
+    db.flush()
     device.thresholds.extend(
         Threshold(metric_code=item.metric_code, unit=item.unit, min_value=item.min_value, max_value=item.max_value)
         for item in payload
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se pudieron guardar los umbrales por un conflicto de datos. Revisa que no haya métricas duplicadas e inténtalo de nuevo.",
+        ) from exc
     return get_device_or_404(device_id, db).thresholds
 
 

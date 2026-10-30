@@ -16,6 +16,7 @@ import { DeviceTable } from "../components/reader/DeviceTable.jsx";
 import { RecentAlerts } from "../components/reader/RecentAlerts.jsx";
 import { SummaryCard } from "../components/reader/SummaryCard.jsx";
 import { isAdmin } from "../constants/roles.js";
+import { TELEMETRY_REFRESH_MS, TELEMETRY_REFRESH_SECONDS } from "../constants/telemetry.js";
 import { fetchAlerts } from "../services/dashboardApi.js";
 import { getTelemetrySummary } from "../services/reportApi.js";
 import { listDevices } from "../services/deviceApi.js";
@@ -24,6 +25,7 @@ import { AlertsPage } from "./AlertsPage.jsx";
 import { TicketsPage } from "./TicketsPage.jsx";
 import { TelemetryPage } from "./TelemetryPage.jsx";
 import { UsersPage } from "./UsersPage.jsx";
+import { ReportsPage } from "./ReportsPage.jsx";
 
 export function DashboardPage({ user, onLogout }) {
   const [activeItem, setActiveItem] = useState("inicio");
@@ -33,11 +35,32 @@ export function DashboardPage({ user, onLogout }) {
   const [error, setError] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
   const [ticketsEntry, setTicketsEntry] = useState({ view: "list", key: 0 });
+  const [deviceSearchQuery, setDeviceSearchQuery] = useState("");
+  const [deviceSearchKey, setDeviceSearchKey] = useState(0);
+  const [focusedAlertId, setFocusedAlertId] = useState("");
+  const [alertFocusKey, setAlertFocusKey] = useState(0);
 
   function navigate(item) {
     if (item === "tickets") setTicketsEntry((current) => ({ view: "list", key: current.key + 1 }));
     setActiveItem(item);
   }
+
+  function navigateToDeviceSearch(term) {
+    setDeviceSearchQuery(term);
+    setDeviceSearchKey((key) => key + 1);
+    setActiveItem("dispositivos");
+  }
+
+  function navigateToAlert(alertId) {
+    setFocusedAlertId(alertId);
+    setAlertFocusKey((key) => key + 1);
+    setActiveItem("alertas");
+  }
+
+  useEffect(() => {
+    if (activeItem !== "dispositivos") setDeviceSearchQuery("");
+    if (activeItem !== "alertas") setFocusedAlertId("");
+  }, [activeItem]);
 
   function openTicketForm() {
     setTicketsEntry((current) => ({ view: "create", key: current.key + 1 }));
@@ -104,7 +127,7 @@ export function DashboardPage({ user, onLogout }) {
       }
     };
     loadTelemetry();
-    const timer = setInterval(loadTelemetry, 15 * 1000);
+    const timer = setInterval(loadTelemetry, TELEMETRY_REFRESH_MS);
     return () => { isMounted = false; clearInterval(timer); };
   }, [user.role]);
 
@@ -122,17 +145,29 @@ export function DashboardPage({ user, onLogout }) {
       activeItem={activeItem}
       onNavigate={navigate}
       onLogout={onLogout}
+      onNavigateToDeviceSearch={navigateToDeviceSearch}
+      onNavigateToAlert={navigateToAlert}
     >
       {activeItem === "dispositivos" ? (
-        <DevicesPage user={user} />
+        <DevicesPage
+          key={`devices-${deviceSearchKey}`}
+          user={user}
+          initialSearch={deviceSearchQuery}
+        />
       ) : activeItem === "alertas" ? (
-        <AlertsPage user={user} />
+        <AlertsPage
+          key={`alerts-${alertFocusKey}`}
+          user={user}
+          initialAlertId={focusedAlertId}
+        />
       ) : activeItem === "tickets" ? (
         <TicketsPage key={ticketsEntry.key} initialView={ticketsEntry.view} user={user} />
       ) : activeItem === "telemetria" ? (
         <TelemetryPage />
       ) : activeItem === "usuarios" && isAdmin(user.role) ? (
         <UsersPage />
+      ) : activeItem === "reportes" && isAdmin(user.role) ? (
+        <ReportsPage />
       ) : activeItem === "inicio" && isAdmin(user.role) ? (
         <AdminDashboard onNavigate={setActiveItem} />
       ) : (
@@ -251,7 +286,7 @@ export function DashboardPage({ user, onLogout }) {
 
             <section className="reader-panel reader-telemetry-panel" aria-label="Telemetría en tiempo real">
               <div className="reader-panel__header">
-                <div><h2>Telemetría ambiental reciente</h2><p>Lecturas simuladas del ambiente actualizadas cada 15 segundos.</p></div>
+                <div><h2>Telemetría ambiental reciente</h2><p>Lecturas simuladas del ambiente actualizadas cada {TELEMETRY_REFRESH_SECONDS} segundos.</p></div>
                 <span className="reader-telemetry-panel__count">{telemetry ? `${telemetry.readings.today} hoy` : "Cargando..."}</span>
               </div>
               {telemetry?.chart_24h?.length ? <LineChart24h points={telemetry.chart_24h} /> : <div className="reader-empty-state"><BarChart3 className="reader-empty-state__icon" size={30} /><p>Aún no hay lecturas disponibles.</p><span>Las lecturas aparecerán cuando el simulador esté habilitado.</span></div>}

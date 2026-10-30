@@ -80,3 +80,129 @@ class DeviceTelemetrySeries(BaseModel):
     points: list[DeviceTelemetryPoint]
     period: str
     resolution: str
+
+
+# HU11: Esquemas para reportes administrativos de dispositivos.
+
+from datetime import date
+
+
+class DeviceReportSummary(BaseModel):
+    total: int
+    activos: int
+    inactivos: int
+    mantenimiento: int
+
+
+class DeviceReportDetail(BaseModel):
+    id: UUID
+    device_code: str
+    name: str
+    device_type: str
+    location: str
+    status: str
+    created_at: datetime
+
+
+class DeviceReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+
+
+class DeviceReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: DeviceReportSummary
+    timeline: list[DeviceReportTimelinePoint]
+    devices: list[DeviceReportDetail]
+    generated_at: datetime
+
+
+# HU11: Esquemas para reportes administrativos de alertas.
+
+
+class AlertReportSummary(BaseModel):
+    total: int
+    criticas: int
+    advertencias: int
+    abiertas: int
+    revisadas: int
+    cerradas: int
+
+
+class AlertReportDetail(BaseModel):
+    id: UUID
+    device_id: UUID
+    device_code: str | None = None
+    device_name: str | None = None
+    metric_code: str
+    value: Decimal
+    unit: str
+    severity: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    resolved_at: datetime | None = None
+
+
+class AlertReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+    criticas: int
+    advertencias: int
+
+
+class AlertReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: AlertReportSummary
+    timeline: list[AlertReportTimelinePoint]
+    alerts: list[AlertReportDetail]
+    generated_at: datetime
+
+
+# HU11: Esquemas del reporte administrativo de tickets.
+
+class TicketReportSummary(BaseModel):
+    total: int
+    abiertos: int
+    en_revision: int
+    resueltos: int
+    cerrados: int
+
+
+class TicketReportDetail(BaseModel):
+    id: UUID
+    ticket_number: int | None = None
+    device_id: UUID
+    device_code: str | None = None
+    device_name: str | None = None
+    category: str
+    description: str
+    status: str
+    created_by_user_id: int
+    assigned_to_user_id: int | None = None
+    resolved_by_user_id: int | None = None
+    resolved_at: datetime | None = None
+    closed_by_user_id: int | None = None
+    closed_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketReportTimelinePoint(BaseModel):
+    day: date
+    total: int
+    abiertos: int
+    en_revision: int
+    resueltos: int
+    cerrados: int
+
+
+class TicketReportResponse(BaseModel):
+    start_date: date
+    end_date: date
+    summary: TicketReportSummary
+    timeline: list[TicketReportTimelinePoint]
+    tickets: list[TicketReportDetail]
+    generated_at: datetime

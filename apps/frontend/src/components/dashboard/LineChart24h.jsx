@@ -5,6 +5,8 @@ const HEIGHT = 300;
 const PAD = { top: 22, right: 22, bottom: 42, left: 22 };
 const GRID_LINES = 5;
 const HOUR_MS = 60 * 60 * 1000;
+const MIN_RECENT_WINDOW_MS = 20 * 60 * 1000;
+const RECENT_PADDING_MS = 2 * 60 * 1000;
 
 export const SERIES = [
   { key: "temperatura", label: "Temp (°C)", unit: "°C", color: "#c98a00" },
@@ -13,11 +15,31 @@ export const SERIES = [
 
 const formatHour = (date) => date.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const formatDateTime = (date) => date.toLocaleString("es-BO", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", hourCycle: "h23" });
+const formatCoverage = (milliseconds) => milliseconds >= HOUR_MS
+  ? `${Math.max(1, Math.round(milliseconds / HOUR_MS))} h`
+  : `${Math.max(1, Math.round(milliseconds / 60000))} min`;
 
 export function LineChart24h({ points }) {
   const [hovered, setHovered] = useState(null);
-  const end = Date.now();
-  const start = end - 24 * HOUR_MS;
+  // Remontar las series sólo cuando cambian los datos permite una transición
+  // breve al refrescar el dashboard, sin animar continuamente el gráfico.
+  const chartRevision = points.map((point) => `${point.hour}:${point.temperatura ?? ""}:${point.humedad ?? ""}`).join("|");
+  const observedTimes = points.flatMap((point) => SERIES
+    .filter((serie) => point[serie.key] !== null && point[serie.key] !== undefined)
+    .map(() => new Date(point.hour).getTime()))
+    .filter(Number.isFinite);
+  const firstReadingAt = observedTimes.length ? Math.min(...observedTimes) : Date.now();
+  const latestReadingAt = observedTimes.length ? Math.max(...observedTimes) : Date.now();
+  const dataCoverage = Math.max(0, latestReadingAt - firstReadingAt);
+  // Durante el arranque del simulador no existen aún 24 h de lecturas. En vez
+  // de comprimirlas a la derecha, se enfoca de forma honesta el rango que ya
+  // está disponible; al completar el historial se usa la ventana de 24 h.
+  const useRecentFocus = observedTimes.length > 0 && dataCoverage < 23 * HOUR_MS;
+  const end = Math.max(Date.now(), latestReadingAt);
+  const padding = Math.max(RECENT_PADDING_MS, dataCoverage * 0.12);
+  const start = useRecentFocus
+    ? Math.min(firstReadingAt - padding, end - Math.max(MIN_RECENT_WINDOW_MS, dataCoverage + padding * 2))
+    : end - 24 * HOUR_MS;
   const innerW = WIDTH - PAD.left - PAD.right;
   const innerH = HEIGHT - PAD.top - PAD.bottom;
   const x = (time) => PAD.left + Math.max(0, Math.min(1, (time - start) / (end - start))) * innerW;
@@ -37,8 +59,13 @@ export function LineChart24h({ points }) {
     const y = (value) => PAD.top + innerH * (0.88 - ((value - min) / range) * 0.76);
     return { ...serie, min, max, values: values.map((value) => ({ ...value, cx: x(value.time), cy: y(value.value) })) };
   });
+  // Dos muestras no describen una tendencia. Además, al normalizar temperatura
+  // y humedad por separado, dos cambios proporcionales pueden quedar uno sobre
+  // otro; mostrar únicamente sus marcadores evita que una serie oculte a la
+  // otra durante los primeros minutos después de iniciar el simulador.
+  const hasTrend = lines.some((line) => line.values.length >= 3);
 
-  const ticks = Array.from({ length: 7 }, (_, index) => start + (index * 24 * HOUR_MS) / 6);
+  const ticks = Array.from({ length: 7 }, (_, index) => start + (index * (end - start)) / 6);
   const selectNearest = (event, line) => {
     const bounds = event.currentTarget.ownerSVGElement.getBoundingClientRect();
     const pointerX = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
@@ -56,7 +83,7 @@ export function LineChart24h({ points }) {
 
   return (
     <div className="admin-chart-wrap">
-      <svg className="admin-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Gráfico interactivo de temperatura y humedad ambiental de las últimas 24 horas" preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
+      <svg className="admin-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`Gráfico interactivo de temperatura y humedad ambiental${useRecentFocus ? ", con escala reciente adaptativa" : " de las últimas 24 horas"}`} preserveAspectRatio="none" onMouseLeave={() => setHovered(null)}>
         {Array.from({ length: GRID_LINES }, (_, index) => {
           const gy = PAD.top + (index * innerH) / (GRID_LINES - 1);
           return <line key={index} x1={PAD.left} x2={WIDTH - PAD.right} y1={gy} y2={gy} className="admin-chart__grid" />;
@@ -64,20 +91,22 @@ export function LineChart24h({ points }) {
         {ticks.map((tick, index) => <text key={tick} x={x(tick)} y={HEIGHT - 12} className="admin-chart__label" textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{index === ticks.length - 1 ? "Ahora" : formatHour(new Date(tick))}</text>)}
         {hovered && <line x1={hovered.cx} x2={hovered.cx} y1={PAD.top} y2={HEIGHT - PAD.bottom} className="admin-chart__guide" />}
         {lines.map((line) => line.values.length > 0 && (
-          <g key={line.key}>
-            <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <g key={`${line.key}-${chartRevision}`} className="chart-series chart-series--enter">
+            {line.values.length >= 3 && <><polyline className="chart-series__line" points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke={line.color} strokeWidth="2.5" strokeDasharray={line.key === "humedad" ? "7 5" : undefined} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             {line.values.slice(1).map((value, index) => {
               const previous = line.values[index];
-              return value.outOfRange && <line key={`alert-${value.time}`} x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" />;
+              return value.outOfRange && <g key={`alert-${value.time}`}><line className="chart-alert-aura" x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} /><line x1={previous.cx} y1={previous.cy} x2={value.cx} y2={value.cy} stroke="#d93025" strokeWidth="3" vectorEffect="non-scaling-stroke" /></g>;
             })}
-            <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} />
-            {line.values.map((value) => <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : value.outOfRange ? 4.8 : 3.5} className="admin-chart__point" fill={value.outOfRange ? "#d93025" : line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
+            <polyline points={line.values.map((value) => `${value.cx},${value.cy}`).join(" ")} fill="none" stroke="transparent" strokeWidth="18" strokeLinejoin="round" strokeLinecap="round" onMouseMove={(event) => selectNearest(event, line)} /></>}
+            {line.values.map((value) => value.outOfRange ? <g key={value.time}><circle className="chart-alert-halo" cx={value.cx} cy={value.cy} r="8" /><circle cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 4.8} className="admin-chart__point" fill="#d93025" onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} /></g> : line.key === "humedad" ? <rect key={value.time} x={value.cx - 4} y={value.cy - 4} width={8} height={8} rx="1" className="admin-chart__point admin-chart__point--humidity" onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} /> : <circle key={value.time} cx={value.cx} cy={value.cy} r={hovered?.key === line.key && hovered.time === value.time ? 5.5 : 3.5} className="admin-chart__point" fill={line.color} onMouseEnter={() => setHovered({ ...value, key: line.key, label: line.label, unit: line.unit })} />)}
           </g>
         ))}
       </svg>
       {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.label}: {hovered.value.toFixed(1)} {hovered.unit}</strong><span>{formatDateTime(new Date(hovered.time))}{hovered.outOfRange ? " · Fuera de umbral" : ""}</span></div>}
       <div className="admin-chart-summary" aria-label="Resumen de rangos">
         {lines.filter((line) => line.values.length).map((line) => <span key={line.key}><i style={{ background: line.color }} />{line.label}: {line.min.toFixed(1)}–{line.max.toFixed(1)} {line.unit}</span>)}
+        {useRecentFocus && <span className="admin-chart-coverage">Vista reciente · {formatCoverage(dataCoverage)} de datos disponibles</span>}
+        {!hasTrend && <span className="admin-chart-coverage">Recopilando muestras para trazar la tendencia</span>}
       </div>
     </div>
   );

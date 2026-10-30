@@ -111,6 +111,12 @@ body {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Oculta el revelador nativo (Edge/Windows) para evitar solaparlo con el control propio */
+.auth-input-wrap input::-ms-reveal,
+.auth-input-wrap input::-ms-clear {
+  display: none;
+}
+
 .auth-input-wrap input::placeholder {
   color: #9aa8a1;
 }
@@ -143,19 +149,26 @@ body {
 
 .auth-toggle-password {
   position: absolute;
-  right: 12px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--green-900);
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
+  border-radius: 6px;
+  line-height: 0;
 }
 
 .auth-toggle-password:hover {
   color: var(--green-700);
+}
+
+.auth-toggle-password:focus-visible {
+  outline: 2px solid rgba(11, 79, 53, 0.35);
+  outline-offset: 1px;
 }
 
 .auth-error {
@@ -209,14 +222,19 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+  overflow: visible;
 }
 
+/* No forzar el iframe al 100%: el botón de Google recorta el logo G. */
 .auth-google-wrapper > div {
-  width: 100% !important;
+  width: auto !important;
+  max-width: 100%;
 }
 
 .auth-google-wrapper iframe {
-  width: 100% !important;
+  max-width: 100%;
 }
 
 .auth-google-wrapper--loading {

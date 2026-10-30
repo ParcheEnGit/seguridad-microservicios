@@ -182,17 +182,28 @@
   border-bottom: 1px solid #e5ece8;
 }
 
+.dashboard-search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 520px;
+}
+
 .dashboard-search {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
-  max-width: 520px;
+  width: 100%;
   padding: 0 14px;
   border: 1px solid #d8e3dc;
   border-radius: 999px;
   background: #fafcfb;
   color: #9aa8a1;
+}
+
+.dashboard-search:focus-within {
+  border-color: #86b8a3;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(11, 79, 53, 0.08);
 }
 
 .dashboard-search input {
@@ -208,8 +219,89 @@
   outline: none;
 }
 
-.dashboard-search input:disabled {
-  cursor: not-allowed;
+.dashboard-search-results {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: min(420px, 70vh);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #d8e3dc;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+}
+
+.dashboard-search-results__status {
+  margin: 0;
+  padding: 12px 10px;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.dashboard-search-results section + section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eef2f0;
+}
+
+.dashboard-search-results h2 {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-search-results button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-search-results button:hover,
+.dashboard-search-results button:focus-visible {
+  background: #f3faf6;
+  outline: none;
+}
+
+.dashboard-search-results button span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-search-results button strong {
+  font-size: 0.95rem;
+}
+
+.dashboard-search-results button small {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.dashboard-search-results svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #0b4f35;
 }
 
 .dashboard-topbar__actions {
@@ -1199,7 +1291,7 @@
     white-space: nowrap;
   }
 
-  .dashboard-search {
+  .dashboard-search-wrap {
     display: none;
   }
 
@@ -1381,6 +1473,13 @@
   border-radius: 99px;
 }
 
+.admin-chart-coverage {
+  border-left: 1px solid #dce7e1;
+  padding-left: 12px;
+  color: #527060;
+  font-weight: 650;
+}
+
 .admin-chart__grid {
   stroke: #edf1ef;
   stroke-width: 1;
@@ -1393,7 +1492,42 @@
 }
 
 .admin-chart__point { cursor: crosshair; stroke: #fff; stroke-width: 1.5; }
+.admin-chart__point--humidity { fill: rgba(255, 255, 255, .2); stroke: #1a73e8; stroke-width: 2; }
 .admin-chart__guide { stroke: #93a79c; stroke-width: 1; stroke-dasharray: 3 4; }
+
+/* Transiciones breves al llegar telemetría nueva y una señal discreta, pero
+   visible, sobre los tramos que salen del umbral. */
+.chart-series--enter { animation: chart-series-fade-in .52s ease-out both; }
+.chart-series__line { animation: chart-series-settle .62s cubic-bezier(.22, .8, .3, 1) both; }
+.chart-alert-aura { stroke: #ef5350; stroke-width: 10; stroke-linecap: round; opacity: .18; vector-effect: non-scaling-stroke; animation: chart-alert-glow 1.7s ease-in-out infinite; }
+.chart-alert-halo { fill: #ef5350; opacity: .22; transform-box: fill-box; transform-origin: center; animation: chart-alert-pulse 1.7s ease-in-out infinite; pointer-events: none; }
+
+@keyframes chart-series-fade-in {
+  from { opacity: .2; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chart-series-settle {
+  from { opacity: .18; filter: saturate(.75) blur(.15px); }
+  to { opacity: 1; filter: saturate(1) blur(0); }
+}
+
+@keyframes chart-alert-glow {
+  0%, 100% { opacity: .15; stroke-width: 8; }
+  50% { opacity: .42; stroke-width: 13; }
+}
+
+@keyframes chart-alert-pulse {
+  0%, 100% { opacity: .16; transform: scale(.82); }
+  50% { opacity: .5; transform: scale(1.28); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-series--enter,
+  .chart-series__line,
+  .chart-alert-aura,
+  .chart-alert-halo { animation: none; }
+}
 
 .admin-chart-card__actions {
   display: flex;
@@ -1555,6 +1689,7 @@
   .device-telemetry-chart { height: 235px; }
   .chart-tooltip { max-width: calc(100% - 18px); padding: 7px 9px; }
   .admin-chart-card__actions { justify-content: flex-start; }
+  .admin-chart-coverage { width: 100%; border-left: 0; padding-left: 0; }
   .admin-threshold-modal__grid { grid-template-columns: 1fr; }
 }
 

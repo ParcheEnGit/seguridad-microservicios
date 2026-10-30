@@ -6,15 +6,22 @@ import {
   Eye,
   RefreshCw,
   ShieldAlert,
+  Ticket,
   X,
 } from "lucide-react";
 import { isAdmin } from "../constants/roles.js";
+import {
+  TICKET_CATEGORIES,
+  TICKET_DESCRIPTION_MAX,
+  TICKET_DESCRIPTION_MIN,
+} from "../constants/tickets.js";
 import {
   fetchAlertDetail,
   fetchManagedAlerts,
   setAlertStatus,
 } from "../services/alertsApi.js";
 import { listDevices } from "../services/deviceApi.js";
+import { createTicket } from "../services/ticketApi.js";
 import "./alerts.css";
 
 const STATUS_LABELS = {
@@ -53,6 +60,12 @@ function formatValue(value, unit = "") {
 
 function thresholdDescription(alert) {
   const value = Number(alert.value);
+  if (alert.condition === "near_min") {
+    return `Cerca del mínimo (${formatValue(alert.threshold_min, alert.unit)})`;
+  }
+  if (alert.condition === "near_max") {
+    return `Cerca del máximo (${formatValue(alert.threshold_max, alert.unit)})`;
+  }
   if (alert.threshold_max !== null && value > Number(alert.threshold_max)) {
     return `Sobre el máximo (${formatValue(alert.threshold_max, alert.unit)})`;
   }
@@ -72,6 +85,12 @@ function AlertDetailDialog({ alertId, onClose }) {
   const [alert, setAlert] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showTicketForm, setShowTicketForm] = useState(false);
+  const [ticketCategory, setTicketCategory] = useState("otro");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketError, setTicketError] = useState("");
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -89,6 +108,42 @@ function AlertDetailDialog({ alertId, onClose }) {
       mounted = false;
     };
   }, [alertId]);
+
+  useEffect(() => {
+    if (!alert) return;
+    setTicketDescription(
+      `Alerta de telemetría: ${METRIC_LABELS[alert.metric_code] ?? alert.metric_code}. ` +
+      `Valor registrado: ${formatValue(alert.value, alert.unit)}; ${thresholdDescription(alert)}. ` +
+      `Severidad: ${SEVERITY_LABELS[alert.severity] ?? alert.severity}.`,
+    );
+  }, [alert]);
+
+  async function submitTicket(event) {
+    event.preventDefault();
+    const description = ticketDescription.trim();
+    if (description.length < TICKET_DESCRIPTION_MIN) {
+      setTicketError(`La descripción debe tener al menos ${TICKET_DESCRIPTION_MIN} caracteres.`);
+      return;
+    }
+
+    setTicketError("");
+    setSavingTicket(true);
+    try {
+      const ticket = await createTicket({
+        deviceId: alert.device_id,
+        category: ticketCategory,
+        description,
+        priority: alert.severity,
+        alertId: alert.id,
+      });
+      setCreatedTicket(ticket);
+      setShowTicketForm(false);
+    } catch (requestError) {
+      setTicketError(requestMessage(requestError));
+    } finally {
+      setSavingTicket(false);
+    }
+  }
 
   return (
     <div
@@ -148,6 +203,66 @@ function AlertDetailDialog({ alertId, onClose }) {
                   </details>
                 )}
               </section>
+              <section className="alerts-detail-block alerts-ticket">
+                <h3>Ticket de incidencia</h3>
+                {createdTicket ? (
+                  <p className="alerts-notice" role="status">
+                    Ticket creado exitosamente. Código: <strong>{createdTicket.code}</strong>
+                  </p>
+                ) : showTicketForm ? (
+                  <form className="alerts-ticket__form" onSubmit={submitTicket}>
+                    {ticketError && <p className="alerts-error" role="alert">{ticketError}</p>}
+                    <label>
+                      <span>Categoría</span>
+                      <select
+                        value={ticketCategory}
+                        onChange={(event) => setTicketCategory(event.target.value)}
+                        disabled={savingTicket}
+                      >
+                        {TICKET_CATEGORIES.map((category) => (
+                          <option key={category.value} value={category.value}>{category.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Descripción</span>
+                      <textarea
+                        rows={4}
+                        maxLength={TICKET_DESCRIPTION_MAX}
+                        value={ticketDescription}
+                        onChange={(event) => setTicketDescription(event.target.value)}
+                        disabled={savingTicket}
+                      />
+                      <small>{ticketDescription.trim().length}/{TICKET_DESCRIPTION_MAX} caracteres</small>
+                    </label>
+                    <div className="alerts-ticket__actions">
+                      <button
+                        type="button"
+                        className="alerts-action-button"
+                        onClick={() => setShowTicketForm(false)}
+                        disabled={savingTicket}
+                      >
+                        Cancelar
+                      </button>
+                      <button type="submit" className="alerts-action-button" disabled={savingTicket}>
+                        <Ticket size={15} /> {savingTicket ? "Generando..." : "Confirmar ticket"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="alerts-action-button"
+                    onClick={() => {
+                      setTicketError("");
+                      setShowTicketForm(true);
+                    }}
+                    disabled={!alert.device_id}
+                  >
+                    <Ticket size={15} /> Generar ticket
+                  </button>
+                )}
+              </section>
             </>
           )}
         </div>
@@ -156,7 +271,7 @@ function AlertDetailDialog({ alertId, onClose }) {
   );
 }
 
-export function AlertsPage({ user }) {
+export function AlertsPage({ user, initialAlertId = "" }) {
   const admin = isAdmin(user.role);
   const [alerts, setAlerts] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -167,7 +282,7 @@ export function AlertsPage({ user }) {
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
   const [savingAlertId, setSavingAlertId] = useState("");
-  const [detailAlertId, setDetailAlertId] = useState("");
+  const [detailAlertId, setDetailAlertId] = useState(initialAlertId);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
