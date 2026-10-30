@@ -111,6 +111,13 @@ CHART_24H_SQL = text("""
     WHERE r.recorded_at >= NOW() - INTERVAL '24 hours'
       AND r.metric_code IN ('temperatura', 'humedad')
       AND concat_ws(' ', d.name, d.device_code, d.device_type) ILIKE '%ambient%'
+      -- No mezclar rellenos históricos del simulador con las mediciones del
+      -- ciclo actual: se reciben mucho después de su recorded_at y dibujan
+      -- diagonales artificiales al reiniciar el entorno.
+      AND (
+          r.source IS DISTINCT FROM 'simulador'
+          OR r.received_at - r.recorded_at <= INTERVAL '5 minutes'
+      )
     GROUP BY 1
     ORDER BY 1
 """)
