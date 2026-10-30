@@ -1492,6 +1492,7 @@
 }
 
 .admin-chart__point { cursor: crosshair; stroke: #fff; stroke-width: 1.5; }
+.admin-chart__point--humidity { fill: rgba(255, 255, 255, .2); stroke: #1a73e8; stroke-width: 2; }
 .admin-chart__guide { stroke: #93a79c; stroke-width: 1; stroke-dasharray: 3 4; }
 
 /* Transiciones breves al llegar telemetría nueva y una señal discreta, pero
