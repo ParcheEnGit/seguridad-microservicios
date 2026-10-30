@@ -95,7 +95,9 @@ RECENT_ALERTS_SQL = text("""
 """)
 
 CHART_24H_SQL = text("""
-    SELECT date_bin(INTERVAL '5 minutes', r.recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
+    -- Un minuto conserva la evolución ambiental de un simulador que emite
+    -- cada pocos segundos, sin acercarse al volumen de las lecturas crudas.
+    SELECT date_bin(INTERVAL '1 minute', r.recorded_at, TIMESTAMPTZ '2000-01-01') AS hour,
            AVG(r.value) FILTER (WHERE r.metric_code = 'temperatura')::float       AS temperatura,
            AVG(r.value) FILTER (WHERE r.metric_code = 'humedad')::float           AS humedad,
            COALESCE(BOOL_OR(r.value < t.min_value OR r.value > t.max_value)
