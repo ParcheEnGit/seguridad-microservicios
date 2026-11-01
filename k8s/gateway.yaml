@@ -1,0 +1,61 @@
+# Punto de entrada HTTPS. Usa la misma configuración de Nginx que compose.yaml
+# (infra/nginx/default.conf): los Services tienen los mismos nombres que los
+# servicios de compose. En k3s, ServiceLB lo publica en el puerto 443 de la VM.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: labsentinel
+spec:
+  type: LoadBalancer
+  selector:
+    app: gateway
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: nginx:1.29-alpine
+          ports:
+            - containerPort: 443
+          readinessProbe:
+            tcpSocket:
+              port: 443
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: tls
+              mountPath: /etc/nginx/tls
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: gateway-config
+        - name: tls
+          secret:
+            secretName: labsentinel-tls
+            items:
+              - { key: tls.crt, path: localhost.crt }
+              - { key: tls.key, path: localhost.key }

@@ -1,6 +1,6 @@
 # Despliegue en un servidor en la nube
 
-Esta guía publica LabSentinel en una máquina virtual con IP pública, usando el mismo `compose.yaml` más los ajustes de [compose.prod.yaml](../compose.prod.yaml). No requiere Kubernetes.
+Esta guía publica LabSentinel en una máquina virtual con IP pública, usando el mismo `compose.yaml` más los ajustes de [compose.prod.yaml](../compose.prod.yaml). Para desplegar en Kubernetes (k3s), ver [despliegue-kubernetes.md](despliegue-kubernetes.md).
 
 Resultado: la aplicación queda en `https://<dominio>` y Keycloak en `https://<dominio>:8443`, con un certificado de Let's Encrypt reconocido por cualquier navegador.
 
