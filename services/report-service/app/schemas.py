@@ -70,6 +70,7 @@ class DeviceTelemetryPoint(BaseModel):
     bucket: datetime
     device_id: UUID
     metric_code: str
+    unit: str
     value: float
     out_of_range: bool = False
     simulated_peak: bool = False
