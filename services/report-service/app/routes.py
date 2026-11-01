@@ -141,7 +141,7 @@ SERIES_DEVICES_SQL = text("""
 
 DEVICE_SERIES_SQL = text("""
     SELECT date_bin(CAST(:bucket AS interval), r.recorded_at, TIMESTAMPTZ '2000-01-01') AS bucket,
-           r.device_id, r.metric_code, AVG(r.value)::float AS value,
+           r.device_id, r.metric_code, r.unit, AVG(r.value)::float AS value,
            COALESCE(BOOL_OR(r.value < t.min_value OR r.value > t.max_value), FALSE) AS out_of_range,
            COALESCE(BOOL_OR((r.payload ->> 'simulation_event') IN ('pico_forzado', 'pico_aleatorio')), FALSE) AS simulated_peak
     FROM telemetry_service.readings r
@@ -149,7 +149,6 @@ DEVICE_SERIES_SQL = text("""
     LEFT JOIN device_service.thresholds t
         ON t.device_id = r.device_id AND t.metric_code = r.metric_code
     WHERE r.recorded_at >= NOW() - CAST(:period AS interval)
-      AND r.metric_code IN ('temperatura', 'humedad')
       -- No se muestran rellenos históricos antiguos del simulador. Fueron
       -- recibidos mucho después de su timestamp y no representan mediciones
       -- continuas; conservarlos visualmente creaba diagonales engañosas.
@@ -157,8 +156,10 @@ DEVICE_SERIES_SQL = text("""
           r.source IS DISTINCT FROM 'simulador'
           OR r.received_at - r.recorded_at <= INTERVAL '5 minutes'
       )
-    GROUP BY 1, r.device_id, r.metric_code
-    ORDER BY 1, r.device_id, r.metric_code
+    -- La unidad forma parte de la agrupación: nunca se promedian escalas
+    -- distintas (por ejemplo, °C y °F) como si fueran equivalentes.
+    GROUP BY 1, r.device_id, r.metric_code, r.unit
+    ORDER BY 1, r.device_id, r.metric_code, r.unit
 """)
 
 
