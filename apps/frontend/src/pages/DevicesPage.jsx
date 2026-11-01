@@ -23,6 +23,17 @@ const METRIC_UNITS = {
   potencia: ["W", "kW"],
   iluminacion: ["lx"],
 };
+const METRIC_LABELS = {
+  temperatura: "Temperatura",
+  humedad: "Humedad",
+  co2: "CO₂",
+  calidad_aire: "Calidad del aire",
+  presion: "Presión",
+  voltaje: "Voltaje",
+  corriente: "Corriente",
+  potencia: "Potencia",
+  iluminacion: "Iluminación",
+};
 let thresholdSequence = 0;
 
 const metricKey = (value) => value.trim().toLowerCase();
@@ -234,7 +245,6 @@ function ThresholdModal({ device, onClose, onSaved }) {
 function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
   const options = unitOptions(threshold.metric_code);
   const selectedUnit = normalizedUnit(threshold.metric_code, threshold.unit);
-  const metricListId = `supported-threshold-metrics-${threshold._key}`;
   return (
     <div className="device-threshold-card">
       <div className="device-threshold-card__topline">
@@ -244,18 +254,14 @@ function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
       <div className="device-threshold-grid__fields">
         <label>
           Métrica
-          <input
+          <select
             required
             value={threshold.metric_code}
-            maxLength={THRESHOLD_METRIC_MAX_LENGTH}
-            minLength={2}
-            pattern="[a-zA-Z0-9_]+"
-            title={`Hasta ${THRESHOLD_METRIC_MAX_LENGTH} caracteres (letras, números y guion bajo)`}
             onChange={(event) => onChange(index, "metric_code", event.target.value)}
-            placeholder="temperatura"
-            list={metricListId}
-          />
-          <datalist id={metricListId}>{Object.keys(METRIC_UNITS).map((metric) => <option key={metric} value={metric} />)}</datalist>
+            title="Métrica admitida para umbrales"
+          >
+            {Object.keys(METRIC_UNITS).map((metric) => <option key={metric} value={metric}>{METRIC_LABELS[metric]}</option>)}
+          </select>
         </label>
         <label>
           Unidad
@@ -282,7 +288,7 @@ function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
             title={`Valor numérico entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}`}
             value={threshold.min_value}
             onChange={(event) => onChange(index, "min_value", event.target.value)}
-            placeholder="18"
+            placeholder={threshold.min_value === "" ? "18" : undefined}
           />
         </label>
         <label>
@@ -297,7 +303,7 @@ function ThresholdFields({ threshold, index, removable, onChange, onRemove }) {
             title={`Valor numérico entre -${THRESHOLD_VALUE_ABS_MAX} y ${THRESHOLD_VALUE_ABS_MAX}`}
             value={threshold.max_value}
             onChange={(event) => onChange(index, "max_value", event.target.value)}
-            placeholder="28"
+            placeholder={threshold.max_value === "" ? "28" : undefined}
           />
         </label>
       </div>
