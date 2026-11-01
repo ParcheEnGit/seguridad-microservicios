@@ -7,6 +7,10 @@ const GRID_LINES = 5;
 const HOUR_MS = 60 * 60 * 1000;
 const MIN_RECENT_WINDOW_MS = 20 * 60 * 1000;
 const RECENT_PADDING_MS = 2 * 60 * 1000;
+// El gráfico ambiental agrupa por minuto. Una pausa superior a este margen
+// normalmente significa que el simulador se detuvo y luego se reinició; no se
+// debe comprimir la nueva sesión usando puntos de una ejecución anterior.
+const SESSION_GAP_MS = 10 * 60 * 1000;
 
 export const SERIES = [
   { key: "temperatura", label: "Temp (°C)", unit: "°C", color: "#c98a00" },
@@ -21,10 +25,24 @@ const formatCoverage = (milliseconds) => milliseconds >= HOUR_MS
 
 export function LineChart24h({ points }) {
   const [hovered, setHovered] = useState(null);
+  const allObservedTimes = points.flatMap((point) => SERIES
+    .filter((serie) => point[serie.key] !== null && point[serie.key] !== undefined)
+    .map(() => new Date(point.hour).getTime()))
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right);
+  const latestSessionStart = allObservedTimes.reduce(
+    (sessionStart, observedAt, index) => index > 0 && observedAt - allObservedTimes[index - 1] > SESSION_GAP_MS
+      ? observedAt
+      : sessionStart,
+    allObservedTimes[0],
+  );
+  const pointsForChart = latestSessionStart === undefined
+    ? points
+    : points.filter((point) => new Date(point.hour).getTime() >= latestSessionStart);
   // Remontar las series sólo cuando cambian los datos permite una transición
   // breve al refrescar el dashboard, sin animar continuamente el gráfico.
-  const chartRevision = points.map((point) => `${point.hour}:${point.temperatura ?? ""}:${point.humedad ?? ""}`).join("|");
-  const observedTimes = points.flatMap((point) => SERIES
+  const chartRevision = pointsForChart.map((point) => `${point.hour}:${point.temperatura ?? ""}:${point.humedad ?? ""}`).join("|");
+  const observedTimes = pointsForChart.flatMap((point) => SERIES
     .filter((serie) => point[serie.key] !== null && point[serie.key] !== undefined)
     .map(() => new Date(point.hour).getTime()))
     .filter(Number.isFinite);
@@ -45,7 +63,7 @@ export function LineChart24h({ points }) {
   const x = (time) => PAD.left + Math.max(0, Math.min(1, (time - start) / (end - start))) * innerW;
 
   const lines = SERIES.map((serie) => {
-    const values = points
+    const values = pointsForChart
       .filter((point) => point[serie.key] !== null && point[serie.key] !== undefined)
       .map((point) => ({
         time: new Date(point.hour).getTime(),

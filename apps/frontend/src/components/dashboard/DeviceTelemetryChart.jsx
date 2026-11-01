@@ -9,7 +9,33 @@ const PAD = { top: 22, right: 24, bottom: 38, left: 24 };
 const COLORS = ["#0b5a3b", "#1a73e8", "#c98a00", "#8e44ad", "#d35400", "#00838f", "#c0392b", "#546e7a"];
 const PERIODS = [["1h", "1 h"], ["6h", "6 h"], ["24h", "24 h"], ["7d", "7 días"], ["30d", "30 días"]];
 const RESOLUTIONS = [["15s", "15 s"], ["1m", "1 min"], ["5m", "5 min"], ["15m", "15 min"], ["1h", "1 h"], ["1d", "1 día"]];
-const METRICS = { temperatura: "Temperatura (°C)", humedad: "Humedad (%)" };
+const METRIC_LABELS = {
+  temperatura: "Temperatura",
+  humedad: "Humedad",
+  co2: "CO₂",
+  calidad_aire: "Calidad del aire",
+  presion: "Presión",
+  voltaje: "Voltaje",
+  corriente: "Corriente",
+  potencia: "Potencia",
+  iluminacion: "Iluminación",
+};
+const DISPLAY_UNITS = {
+  "°c": "°C",
+  "°f": "°F",
+  pa: "Pa",
+  hpa: "hPa",
+  kpa: "kPa",
+  mv: "mV",
+  v: "V",
+  ma: "mA",
+  a: "A",
+  w: "W",
+  kw: "kW",
+  ppm: "ppm",
+  lx: "lx",
+  "%": "%",
+};
 const PERIOD_MS = { "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000, "30d": 2592000000 };
 const RESOLUTION_MS = { "15s": 15000, "1m": 60000, "5m": 300000, "15m": 900000, "1h": 3600000, "1d": 86400000 };
 const MIN_RECENT_WINDOW_MS = 10 * 60 * 1000;
@@ -26,6 +52,10 @@ const formatCoverage = (milliseconds) => {
   if (milliseconds < 24 * 60 * 60 * 1000) return `${(milliseconds / 3600000).toFixed(milliseconds < 10 * 3600000 ? 1 : 0)} h`;
   return `${Math.round(milliseconds / 86400000)} días`;
 };
+
+const formatMetricName = (metricCode) => METRIC_LABELS[metricCode]
+  ?? metricCode.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatUnit = (unit) => DISPLAY_UNITS[String(unit ?? "").toLowerCase()] ?? unit;
 
 // No interpolamos una telemetría inexistente: unir puntos separados dibujaría
 // una diagonal que aparenta una medición continua.
@@ -69,6 +99,29 @@ export function DeviceTelemetryChart() {
     const timer = window.setInterval(load, TELEMETRY_REFRESH_MS);
     return () => { mounted = false; window.clearInterval(timer); };
   }, [period, resolution]);
+
+  const availableMetrics = useMemo(() => {
+    if (!data) return [];
+    const unitsByMetric = new Map();
+    data.points.forEach((point) => {
+      if (!unitsByMetric.has(point.metric_code)) unitsByMetric.set(point.metric_code, new Set());
+      unitsByMetric.get(point.metric_code).add(formatUnit(point.unit));
+    });
+    return [...unitsByMetric.entries()].map(([value, units]) => ({
+      value,
+      unit: [...units].join(" / "),
+      label: `${formatMetricName(value)}${units.size ? ` (${[...units].join(" / ")})` : ""}`,
+    }));
+  }, [data]);
+
+  useEffect(() => {
+    if (availableMetrics.length && !availableMetrics.some((item) => item.value === metric)) {
+      setMetric(availableMetrics[0].value);
+    }
+  }, [availableMetrics, metric]);
+
+  const selectedMetric = availableMetrics.find((item) => item.value === metric);
+  const metricUnit = selectedMetric?.unit ?? "";
 
   const { lines, start, end, dataCoverage, useRecentFocus } = useMemo(() => {
     if (!data) return { lines: [], start: 0, end: 1, dataCoverage: 0, useRecentFocus: false };
@@ -150,7 +203,7 @@ export function DeviceTelemetryChart() {
       <div className="telemetry-controls">
         <div><span>Periodo</span>{PERIODS.map(([value, label]) => <button key={value} type="button" className={period === value ? "is-active" : ""} onClick={() => setPeriod(value)}>{label}</button>)}</div>
         <div><span>Intervalo de muestreo</span>{RESOLUTIONS.map(([value, label]) => <button key={value} type="button" className={resolution === value ? "is-active" : ""} onClick={() => setResolution(value)}>{label}</button>)}</div>
-        <div><span>Métrica</span>{Object.entries(METRICS).map(([value, label]) => <button key={value} type="button" className={metric === value ? "is-active" : ""} onClick={() => setMetric(value)}>{label}</button>)}</div>
+        <div><span>Métrica</span>{availableMetrics.map(({ value, label }) => <button key={value} type="button" className={metric === value ? "is-active" : ""} onClick={() => setMetric(value)}>{label}</button>)}</div>
       </div>
 
       {data && (
@@ -195,8 +248,8 @@ export function DeviceTelemetryChart() {
             <text x={PAD.left} y={HEIGHT - 10} className="admin-chart__label">{formatTime(start, period)}</text>
             <text x={WIDTH - PAD.right} y={HEIGHT - 10} textAnchor="end" className="admin-chart__label">Ahora</text>
           </svg>
-          {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.device}: {hovered.value.toFixed(2)} {metric === "temperatura" ? "°C" : "%"}</strong><span>{formatTime(hovered.bucket, period)}{hovered.out_of_range ? " · Fuera de umbral" : ""}{hovered.simulated_peak ? " · Pico de simulación" : ""}</span></div>}
-          {values.length > 0 && <p className="device-telemetry-chart__range">Rango visible: {min.toFixed(2)}–{max.toFixed(2)} {metric === "temperatura" ? "°C" : "%"}</p>}
+          {hovered && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><strong>{hovered.device}: {hovered.value.toFixed(2)} {formatUnit(hovered.unit)}</strong><span>{formatTime(hovered.bucket, period)}{hovered.out_of_range ? " · Fuera de umbral" : ""}{hovered.simulated_peak ? " · Pico de simulación" : ""}</span></div>}
+          {values.length > 0 && <p className="device-telemetry-chart__range">Rango visible: {min.toFixed(2)}–{max.toFixed(2)} {metricUnit}</p>}
           {values.length === 0 && <p className="device-muted">No hay dispositivos seleccionados o lecturas para este periodo.</p>}
         </div>
       )}
