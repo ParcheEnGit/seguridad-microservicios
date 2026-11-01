@@ -118,14 +118,48 @@ El primer comando construye las imágenes con Docker y las importa en k3s. El se
 | Ver el estado | `kubectl -n labsentinel get pods,services` |
 | Ver logs | `kubectl -n labsentinel logs -f deploy/<servicio>` |
 | Escalar un microservicio | `kubectl -n labsentinel scale deploy/telemetry-service --replicas=2` |
-| Actualizar a la última versión | `git pull`, `sudo sh k8s/import-images.sh`, `sudo sh k8s/deploy.sh <cert> <clave>` y `kubectl -n labsentinel rollout restart deployment` |
+| Actualizar a la última versión | Automático con CI/CD (sección 10), o a mano con `sh k8s/redeploy.sh <dominio>` |
 | Detener la aplicación (conserva los datos) | `kubectl -n labsentinel scale deploy --all --replicas=0` y `kubectl -n labsentinel scale statefulset/postgres --replicas=0` |
 | Renovar el certificado (vence cada 90 días) | `sudo certbot renew` y volver a ejecutar `deploy.sh`, luego `kubectl -n labsentinel rollout restart deployment gateway keycloak` |
 | Eliminar todo, incluidos los datos | `kubectl delete namespace labsentinel` |
 
 Si un pod no inicia, `kubectl -n labsentinel describe pod <pod>` muestra el motivo (por ejemplo, una variable que falta en `.env`).
 
-## 10. Consideraciones
+## 10. CI/CD con GitHub Actions
+
+El workflow [.github/workflows/ci-cd.yml](../.github/workflows/ci-cd.yml) se ejecuta en cada push y pull request:
+
+| Job | Qué hace |
+| --- | --- |
+| Pruebas (5 en paralelo) | Instala las dependencias de cada microservicio y ejecuta sus pruebas con pytest |
+| Compilación del frontend | `npm ci` y `npm run build` |
+| Despliegue en la VM | Solo en la rama `feature/despliegue` y si los jobs anteriores pasan: se conecta por SSH y el servidor ejecuta [k8s/redeploy.sh](../k8s/redeploy.sh) (`git reset` a la rama, construcción de imágenes, `deploy.sh` y reinicio de los Deployments) |
+
+Si una prueba falla, no se despliega y la versión anterior sigue en línea. Mientras no existan los secretos, el job de despliegue se omite.
+
+### Configuración (una sola vez)
+
+1. En la VM, crear una llave exclusiva para GitHub Actions que solo puede ejecutar el redespliegue:
+
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C github-actions -f ~/github-deploy
+   echo "restrict,command=\"sh /home/ubuntu/seguridad-microservicios/k8s/redeploy.sh <dominio>\" $(cat ~/github-deploy.pub)" >> ~/.ssh/authorized_keys
+   cat ~/github-deploy
+   echo "<dominio> $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"
+   ```
+
+2. En GitHub, *Settings → Secrets and variables → Actions → New repository secret*:
+
+   | Secreto | Valor |
+   | --- | --- |
+   | `DEPLOY_HOST` | `<dominio>` |
+   | `DEPLOY_SSH_KEY` | Salida completa de `cat ~/github-deploy`, desde `-----BEGIN` hasta `-----END ... KEY-----` |
+   | `DEPLOY_KNOWN_HOSTS` | Salida del último `echo` |
+
+3. Borrar la llave privada de la VM: `rm ~/github-deploy ~/github-deploy.pub`.
+4. Hacer push a `feature/despliegue` y seguir la ejecución en la pestaña **Actions** del repositorio.
+
+## 11. Consideraciones
 
 - Solo los puertos 443 y 8443 quedan expuestos; PostgreSQL y los microservicios usan Services internos del clúster.
 - El clúster tiene un nodo: Kubernetes reinicia los pods que fallan y permite escalar réplicas, pero no hay alta disponibilidad ante la caída de la VM.

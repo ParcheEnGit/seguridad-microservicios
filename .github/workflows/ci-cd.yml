@@ -1,0 +1,73 @@
+# CI: pruebas de los microservicios y compilación del frontend en cada push y
+# pull request. CD: si todo pasa en la rama feature/despliegue, actualiza el
+# clúster k3s de la VM por SSH (ver docs/despliegue-kubernetes.md).
+name: CI/CD
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Pruebas ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [auth-service, device-service, telemetry-service, alert-ticket-service, report-service]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+      - run: pip install -r requirements.txt pytest httpx
+      - run: python -m pytest -q
+
+  frontend:
+    name: Compilación del frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  deploy:
+    name: Despliegue en la VM
+    needs: [tests, frontend]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feature/despliegue'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      # En el servidor, esta llave solo puede ejecutar k8s/redeploy.sh
+      # (comando forzado en authorized_keys).
+      - name: Desplegar por SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::notice::Faltan los secretos DEPLOY_*; se omite el despliegue."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -o ServerAliveInterval=30 -i ~/.ssh/deploy_key "ubuntu@$DEPLOY_HOST"
