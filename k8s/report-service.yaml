@@ -50,10 +50,14 @@ spec:
           readinessProbe:
             httpGet: { path: /health, port: 8000 }
             periodSeconds: 5
+            timeoutSeconds: 3
           livenessProbe:
             httpGet: { path: /health, port: 8000 }
             initialDelaySeconds: 20
             periodSeconds: 15
+            # Bajo carga /health puede tardar; se reinicia solo si no responde en ~90 s.
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { memory: 512Mi }
