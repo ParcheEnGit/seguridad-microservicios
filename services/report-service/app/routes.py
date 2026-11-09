@@ -5,7 +5,9 @@ de los demás servicios para mostrarla. Por eso solo ejecuta SELECT de solo lect
 sobre los esquemas device_service, telemetry_service y alert_ticket_service.
 Nunca inserta, actualiza ni borra datos que pertenecen a otros servicios.
 """
+import threading
 from datetime import date, datetime, time, timedelta, timezone
+from time import monotonic
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -163,8 +165,14 @@ DEVICE_SERIES_SQL = text("""
 """)
 
 
-@router.get("/admin-summary", response_model=AdminSummary, summary="Resumen operativo del Dashboard Admin")
-def admin_summary(db: Session = Depends(get_db), _: dict = Depends(require_admin)) -> AdminSummary:
+# El resumen solo cambia cuando llegan lecturas nuevas (cada 15 s), así que se
+# reutiliza durante 15 s en lugar de recalcularlo en cada solicitud.
+SUMMARY_CACHE_SECONDS = 15
+_summary_cache: dict = {"value": None, "expires": 0.0}
+_summary_lock = threading.Lock()
+
+
+def _build_admin_summary(db: Session) -> AdminSummary:
     return AdminSummary(
         devices=dict(db.execute(DEVICE_COUNTS_SQL).mappings().one()),
         alerts=dict(db.execute(ALERT_COUNTS_SQL).mappings().one()),
@@ -174,6 +182,18 @@ def admin_summary(db: Session = Depends(get_db), _: dict = Depends(require_admin
         chart_24h=[dict(row) for row in db.execute(CHART_24H_SQL).mappings()],
         generated_at=datetime.now(timezone.utc),
     )
+
+
+@router.get("/admin-summary", response_model=AdminSummary, summary="Resumen operativo del Dashboard Admin")
+def admin_summary(db: Session = Depends(get_db), _: dict = Depends(require_admin)) -> AdminSummary:
+    if _summary_cache["value"] is not None and monotonic() < _summary_cache["expires"]:
+        return _summary_cache["value"]
+    # Si llegan muchos pedidos a la vez, solo uno calcula; los demás esperan su resultado.
+    with _summary_lock:
+        if _summary_cache["value"] is None or monotonic() >= _summary_cache["expires"]:
+            _summary_cache["value"] = _build_admin_summary(db)
+            _summary_cache["expires"] = monotonic() + SUMMARY_CACHE_SECONDS
+        return _summary_cache["value"]
 
 
 @router.get("/telemetry-summary", response_model=AdminSummary, summary="Resumen de telemetría para dashboards autorizados")
