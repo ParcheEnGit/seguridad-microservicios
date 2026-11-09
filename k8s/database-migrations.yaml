@@ -1,0 +1,39 @@
+# Aplica las migraciones SQL en orden. deploy.sh lo vuelve a crear en cada
+# despliegue, igual que el contenedor database-migrations de compose.yaml.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migrations
+  namespace: labsentinel
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: database-migrations
+        labsentinel/db-client: "true"
+        labsentinel/egress: internal
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrations
+          image: postgres:18-alpine
+          command:
+            - /bin/sh
+            - -ec
+            - until pg_isready -h postgres -U "$POSTGRES_USER"; do sleep 2; done; for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$migration"; done
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_USER } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_DB } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_PASSWORD } }
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: postgres-migrations

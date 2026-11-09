@@ -1,0 +1,142 @@
+# Servicio interno (HTTP 8080): auth-service consulta JWKS y canjea el código.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: labsentinel
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+---
+# Servicio público (HTTPS 8443) para el navegador. En k3s, ServiceLB lo publica
+# en el puerto 8443 de la VM.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-public
+  namespace: labsentinel
+spec:
+  type: LoadBalancer
+  selector:
+    app: keycloak
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        labsentinel/db-client: "true"
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.7.3
+          args:
+            - start-dev
+            - --import-realm
+            - --https-certificate-file=/opt/keycloak/conf/tls/localhost.crt
+            - --https-certificate-key-file=/opt/keycloak/conf/tls/localhost.key
+          ports:
+            - containerPort: 8080
+            - containerPort: 8443
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_ADMIN } }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_ADMIN_PASSWORD } }
+            - name: KEYCLOAK_DB
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_DB } }
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/$(KEYCLOAK_DB)
+            - name: KC_DB_USERNAME
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_DB_USER } }
+            - name: KC_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_DB_PASSWORD } }
+            # Emisor estable en los tokens aunque auth-service use la red interna.
+            - name: KC_HOSTNAME
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_URL_PUBLIC } }
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1536Mi }
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+            - name: tls
+              mountPath: /opt/keycloak/conf/tls
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+        - name: tls
+          secret:
+            secretName: labsentinel-tls
+            items:
+              - { key: tls.crt, path: localhost.crt }
+              - { key: tls.key, path: localhost.key }
+---
+# Sincroniza las URI del cliente labsentinel-web con el dominio público.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-client-config
+  namespace: labsentinel
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: keycloak-client-config
+        labsentinel/egress: internal
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: configure-client
+          image: python:3.11-slim
+          command: ["python", "/scripts/configure-client.py"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_ADMIN } }
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_ADMIN_PASSWORD } }
+            - name: KEYCLOAK_URL_INTERNAL
+              value: http://keycloak:8080
+            - name: KEYCLOAK_REALM
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_REALM } }
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_CLIENT_ID } }
+            - name: KEYCLOAK_REDIRECT_URI
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_REDIRECT_URI } }
+            - name: KEYCLOAK_FRONTEND_URL
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_FRONTEND_URL } }
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: keycloak-client-script

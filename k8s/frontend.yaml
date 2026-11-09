@@ -1,0 +1,40 @@
+# Versión compilada del frontend (etapa production del Dockerfile).
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: labsentinel
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 5173
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        labsentinel/egress: internal
+    spec:
+      containers:
+        - name: frontend
+          image: labsentinel-frontend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5173
+          readinessProbe:
+            httpGet: { path: /, port: 5173 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }

@@ -1,0 +1,36 @@
+# Volúmenes persistentes equivalentes a los volúmenes de compose.yaml.
+# En k3s los aprovisiona local-path en el disco del nodo.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: labsentinel
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Compartido por device-service (escritura) y telemetry-service (lectura);
+# ambos pods corren en el mismo nodo.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: device-images
+  namespace: labsentinel
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ticket-attachments
+  namespace: labsentinel
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: telemetry-service
+  namespace: labsentinel
+spec:
+  selector:
+    app: telemetry-service
+  ports:
+    - port: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-service
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemetry-service
+  template:
+    metadata:
+      labels:
+        app: telemetry-service
+        labsentinel/db-client: "true"
+    spec:
+      containers:
+        - name: telemetry-service
+          image: labsentinel-telemetry-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SERVICE_NAME
+              value: telemetry-service
+            - name: ROOT_PATH
+              value: /api/telemetry
+            - name: APP_ENV
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: APP_ENV } }
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+            - name: SIMULATOR_API_KEY
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SIMULATOR_API_KEY } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: JWT_SECRET } }
+            - name: SMTP_ENABLED
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_ENABLED, optional: true } }
+            - name: SMTP_HOST
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_HOST, optional: true } }
+            - name: SMTP_PORT
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_PORT, optional: true } }
+            - name: SMTP_USERNAME
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_USERNAME, optional: true } }
+            - name: SMTP_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_PASSWORD, optional: true } }
+            - name: SMTP_FROM
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SMTP_FROM, optional: true } }
+            - name: ALERT_EMAIL_RECIPIENTS
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: ALERT_EMAIL_RECIPIENTS, optional: true } }
+            - name: DEVICE_IMAGES_PATH
+              value: /data/device-images
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            # Bajo carga /health puede tardar; se reinicia solo si no responde en ~90 s.
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: device-images
+              mountPath: /data/device-images
+              readOnly: true
+      volumes:
+        - name: device-images
+          persistentVolumeClaim:
+            claimName: device-images

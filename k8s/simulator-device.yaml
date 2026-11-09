@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator-device
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simulator-device
+  template:
+    metadata:
+      labels:
+        app: simulator-device
+        labsentinel/egress: internal
+    spec:
+      containers:
+        - name: simulator-device
+          image: labsentinel-simulator-device:latest
+          imagePullPolicy: Never
+          env:
+            - name: TELEMETRY_URL
+              value: http://telemetry-service:8000
+            - name: APP_ENV
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: APP_ENV } }
+            - name: SIMULATOR_API_KEY
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SIMULATOR_API_KEY } }
+            - name: SIMULATOR_INTERVAL_SECONDS
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SIMULATOR_INTERVAL_SECONDS, optional: true } }
+            - name: SIMULATOR_ENABLED
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SIMULATOR_ENABLED, optional: true } }
+            - name: SIMULATOR_RARE_PEAK_PROBABILITY
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: SIMULATOR_RARE_PEAK_PROBABILITY, optional: true } }
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }

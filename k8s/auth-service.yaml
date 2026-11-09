@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: labsentinel
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: labsentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        labsentinel/db-client: "true"
+    spec:
+      containers:
+        - name: auth-service
+          image: labsentinel-auth-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SERVICE_NAME
+              value: auth-service
+            - name: APP_ENV
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: APP_ENV } }
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgresql+psycopg2://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+            - name: GOOGLE_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: GOOGLE_CLIENT_ID } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: JWT_SECRET } }
+            - name: JWT_EXPIRE_MINUTES
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: JWT_EXPIRE_MINUTES } }
+            - name: CORS_ORIGINS
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: CORS_ORIGINS } }
+            - name: COOKIE_SECURE
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: COOKIE_SECURE } }
+            - name: COOKIE_SAMESITE
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: COOKIE_SAMESITE } }
+            - name: ADMIN_EMAILS
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: ADMIN_EMAILS } }
+            - name: LOCAL_PASSWORD_LOGIN_ENABLED
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: LOCAL_PASSWORD_LOGIN_ENABLED } }
+            - name: KEYCLOAK_ENABLED
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_ENABLED } }
+            - name: KEYCLOAK_URL_INTERNAL
+              value: http://keycloak:8080
+            - name: KEYCLOAK_URL_PUBLIC
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_URL_PUBLIC } }
+            - name: KEYCLOAK_REALM
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_REALM } }
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_CLIENT_ID } }
+            - name: KEYCLOAK_REDIRECT_URI
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_REDIRECT_URI } }
+            - name: KEYCLOAK_FRONTEND_URL
+              valueFrom: { secretKeyRef: { name: labsentinel-env, key: KEYCLOAK_FRONTEND_URL } }
+          readinessProbe:
+            httpGet: { path: /auth/health, port: 8000 }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /auth/health, port: 8000 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            # Bajo carga /health puede tardar; se reinicia solo si no responde en ~90 s.
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }

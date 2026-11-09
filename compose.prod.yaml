@@ -1,0 +1,24 @@
+# Ajustes para desplegar en un servidor público, sobre compose.yaml.
+# Uso (ver docs/despliegue.md):
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+#
+# Los puertos públicos (GATEWAY_PORT=443, KEYCLOAK_PORT=8443), las URL del
+# dominio y los secretos se definen en .env. El certificado de Let's Encrypt
+# se copia al volumen TLS con scripts/install-letsencrypt-cert.sh.
+
+services:
+  # Sirve la versión compilada del frontend en lugar del servidor de desarrollo.
+  frontend:
+    build:
+      context: ./apps/frontend
+      target: production
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_KEYCLOAK_ENABLED: ${VITE_KEYCLOAK_ENABLED:-false}
+        VITE_SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-15}
+    volumes: !reset []
+    restart: unless-stopped
+
+  simulator-device:
+    restart: unless-stopped
